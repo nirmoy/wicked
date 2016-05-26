@@ -33,6 +33,7 @@
 #include <wicked/ethernet.h>
 #include <wicked/infiniband.h>
 #include <wicked/bonding.h>
+#include <wicked/ppp.h>
 #include <wicked/team.h>
 #include <wicked/ovs.h>
 #include <wicked/bridge.h>
@@ -49,6 +50,7 @@
 #include "wicked-client.h"
 #include <netlink/netlink.h>
 #include <sys/param.h>
+#include <arpa/inet.h>
 
 #include "client/client_state.h"
 #include "appconfig.h"
@@ -171,6 +173,8 @@ ni_compat_netdev_free(ni_compat_netdev_t *compat)
 			ni_netdev_put(compat->dev);
 		ni_ifworker_control_free(compat->control);
 		ni_var_array_destroy(&compat->scripts);
+
+		ni_rule_array_destroy(&compat->rules);
 
 		ni_string_free(&compat->dhcp4.hostname);
 		ni_string_free(&compat->dhcp4.client_id);
@@ -446,6 +450,18 @@ __ni_compat_generate_bonding(xml_node_t *ifnode, const ni_compat_netdev_t *compa
 		if (verbose || bond->ad_select) {
 			xml_node_new_element("ad-select", child,
 				ni_bonding_ad_select_name(bond->ad_select));
+		}
+		if (verbose || bond->ad_user_port_key) {
+			xml_node_new_element("ad-user-port-key", child,
+				ni_sprint_uint(bond->ad_user_port_key));
+		}
+		if (verbose || bond->ad_actor_sys_prio != 65535) {
+			xml_node_new_element("ad-actor-sys-prio", child,
+				ni_sprint_uint(bond->ad_actor_sys_prio));
+		}
+		if (bond->ad_actor_system.len) {
+			xml_node_new_element("ad-actor-system", child,
+				ni_link_address_print(&bond->ad_actor_system));
 		}
 		if (verbose || bond->min_links > 0) {
 			xml_node_new_element("min-links", child,
@@ -749,6 +765,148 @@ __ni_compat_generate_team(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 
 	if (!__ni_compat_generate_team_ports(tnode, &team->ports))
 		return FALSE;
+
+	return TRUE;
+}
+
+static ni_bool_t
+__ni_compat_generate_ppp_mode(xml_node_t *tnode, const ni_ppp_mode_t *mode)
+{
+	xml_node_t *rnode;
+	const char *name;
+
+	if (!tnode || !mode)
+		return FALSE;
+
+	if (!(name = ni_ppp_mode_type_to_name(mode->type)))
+		return FALSE;
+
+	rnode = xml_node_new("mode", tnode);
+	xml_node_add_attr(rnode, "name", name);
+
+	switch (mode->type) {
+	case NI_PPP_MODE_PPPOE: {
+		const ni_ppp_mode_pppoe_t *pppoe = &mode->pppoe;
+
+		if (!ni_string_empty(pppoe->device.name))
+			xml_node_new_element("device", rnode, pppoe->device.name);
+	}
+	break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static ni_bool_t
+__ni_compat_generate_ppp(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
+{
+	const ni_ppp_t *ppp;
+	const ni_ppp_config_t *conf;
+	xml_node_t *pnode, *node;
+
+	ppp = ni_netdev_get_ppp(compat->dev);
+	pnode = xml_node_create(ifnode, "ppp");
+
+	if (!__ni_compat_generate_ppp_mode(pnode, &ppp->mode))
+		return FALSE;
+
+	conf = &ppp->config;
+	if (conf->debug)
+		xml_node_new_element("debug", pnode, ni_format_boolean(conf->debug));
+	xml_node_new_element("demand", pnode, ni_format_boolean(conf->demand));
+	xml_node_new_element("persist", pnode, ni_format_boolean(conf->persist));
+	if (conf->idle != -1U)
+		xml_node_new_element("idle", pnode, ni_sprint_uint(conf->idle));
+	if (conf->maxfail != -1U)
+		xml_node_new_element("maxfail", pnode, ni_sprint_uint(conf->maxfail));
+	if (conf->holdoff != -1U)
+		xml_node_new_element("holdoff", pnode, ni_sprint_uint(conf->holdoff));
+
+	xml_node_new_element("multilink", pnode, ni_format_boolean(conf->multilink));
+	if (!ni_string_empty(conf->endpoint))
+		xml_node_new_element("endpoint", pnode, conf->endpoint);
+
+	if ((node = xml_node_new("auth", NULL))) {
+		if (!ni_string_empty(conf->auth.username))
+			xml_node_new_element("username", node, conf->auth.username);
+		if (!ni_string_empty(conf->auth.password))
+			xml_node_new_element("password", node, conf->auth.password);
+
+		if (node->children)
+			xml_node_add_child(pnode, node);
+		else
+			xml_node_free(node);
+	}
+
+	xml_node_new_element("defaultroute", pnode, ni_format_boolean(conf->defaultroute));
+
+	if ((node = xml_node_create(pnode, "dns"))) {
+		xml_node_new_element("usepeerdns", node, ni_format_boolean(conf->dns.usepeerdns));
+
+		if (ni_sockaddr_is_specified(&conf->dns.dns1))
+			xml_node_new_element("dns1", node,
+					ni_sockaddr_print(&conf->dns.dns1));
+		if (ni_sockaddr_is_specified(&conf->dns.dns2))
+			xml_node_new_element("dns2", node,
+					ni_sockaddr_print(&conf->dns.dns2));
+	}
+
+	if ((node = xml_node_new("ipv4", NULL))) {
+		xml_node_t *ipcp;
+
+		if (ni_sockaddr_is_specified(&conf->ipv4.local_ip))
+			xml_node_new_element("local-ip", node,
+					ni_sockaddr_print(&conf->ipv4.local_ip));
+		if (ni_sockaddr_is_specified(&conf->ipv4.remote_ip))
+			xml_node_new_element("remote-ip", node,
+					ni_sockaddr_print(&conf->ipv4.remote_ip));
+
+		if ((ipcp = xml_node_new("ipcp", NULL))) {
+			xml_node_new_element("accept-local", ipcp,
+					ni_format_boolean(conf->ipv4.ipcp.accept_local));
+			xml_node_new_element("accept-remote", ipcp,
+					ni_format_boolean(conf->ipv4.ipcp.accept_remote));
+
+			if (ipcp->children)
+				xml_node_add_child(node, ipcp);
+			else
+				xml_node_free(ipcp);
+		}
+		if (node->children)
+			xml_node_add_child(pnode, node);
+		else
+			xml_node_free(node);
+	}
+
+	if ((node = xml_node_new("ipv6", NULL))) {
+		xml_node_t *ipcp;
+
+		xml_node_new_element("enabled", node, ni_format_boolean(conf->ipv6.enabled));
+		if (conf->ipv6.enabled) {
+			if (ni_sockaddr_is_specified(&conf->ipv6.local_ip))
+				xml_node_new_element("local-ip", node,
+						ni_sockaddr_print(&conf->ipv6.local_ip));
+			if (ni_sockaddr_is_specified(&conf->ipv6.remote_ip))
+				xml_node_new_element("remote-ip", node,
+						ni_sockaddr_print(&conf->ipv6.remote_ip));
+
+			if ((ipcp = xml_node_new("ipcp", NULL))) {
+				xml_node_new_element("accept-local", ipcp,
+						ni_format_boolean(conf->ipv6.ipcp.accept_local));
+				if (ipcp->children)
+					xml_node_add_child(node, ipcp);
+				else
+					xml_node_free(ipcp);
+			}
+		}
+		if (node->children)
+			xml_node_add_child(pnode, node);
+		else
+			xml_node_free(node);
+	}
 
 	return TRUE;
 }
@@ -1187,6 +1345,9 @@ __ni_compat_generate_generic_tunnel(xml_node_t *ifnode, ni_linkinfo_t *link,
 	if (!ifnode)
 		return FALSE;
 
+	if (!ni_string_empty(link->lowerdev.name))
+		xml_node_new_element("device", ifnode, link->lowerdev.name);
+
 	xml_node_new_element("local-address", ifnode,
 			ni_link_address_print(&link->hwaddr));
 	xml_node_new_element("remote-address", ifnode,
@@ -1224,10 +1385,12 @@ __ni_compat_generate_ipip(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 static ni_bool_t
 __ni_compat_generate_gre(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 {
-	xml_node_t *child = NULL;
-	ni_gre_t *gre = NULL;
+	ni_string_array_t flags = NI_STRING_ARRAY_INIT;
 	ni_netdev_t *dev = compat->dev;
+	xml_node_t *child, *encap;
+	ni_gre_t *gre;
 	ni_bool_t rv;
+	char *str = NULL;
 
 	if (!(gre = ni_netdev_get_gre(dev)))
 		return FALSE;
@@ -1236,6 +1399,51 @@ __ni_compat_generate_gre(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 
 	rv = __ni_compat_generate_generic_tunnel(child, &dev->link,
 						&gre->tunnel);
+	if (!rv)
+		return rv;
+
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_ISEQ))
+		ni_string_array_append(&flags, ni_gre_flag_bit_to_name(NI_GRE_FLAG_ISEQ));
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_ICSUM))
+		ni_string_array_append(&flags, ni_gre_flag_bit_to_name(NI_GRE_FLAG_ICSUM));
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_OSEQ))
+		ni_string_array_append(&flags, ni_gre_flag_bit_to_name(NI_GRE_FLAG_OSEQ));
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_OCSUM))
+		ni_string_array_append(&flags, ni_gre_flag_bit_to_name(NI_GRE_FLAG_OCSUM));
+
+	if (!ni_string_empty(ni_string_join(&str, &flags, ", ")))
+		xml_node_new_element("flags", child, str);
+	ni_string_array_destroy(&flags);
+	ni_string_free(&str);
+
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_IKEY))
+		xml_node_new_element("ikey", child, inet_ntoa(gre->ikey));
+	if (gre->flags & NI_BIT(NI_GRE_FLAG_OKEY))
+		xml_node_new_element("okey", child, inet_ntoa(gre->okey));
+
+	if (gre->encap.type == NI_GRE_ENCAP_TYPE_NONE)
+		return rv;
+
+	if (!(encap = xml_node_create(child, "encap")))
+		return FALSE;
+
+	xml_node_new_element("type", encap, ni_gre_encap_type_to_name(gre->encap.type));
+	if (gre->encap.flags & NI_BIT(NI_GRE_ENCAP_FLAG_CSUM))
+		ni_string_array_append(&flags, ni_gre_encap_flag_bit_to_name(NI_GRE_ENCAP_FLAG_CSUM));
+	if (gre->encap.flags & NI_BIT(NI_GRE_ENCAP_FLAG_CSUM6))
+		ni_string_array_append(&flags, ni_gre_encap_flag_bit_to_name(NI_GRE_ENCAP_FLAG_CSUM6));
+	if (gre->encap.flags & NI_BIT(NI_GRE_ENCAP_FLAG_REMCSUM))
+		ni_string_array_append(&flags, ni_gre_encap_flag_bit_to_name(NI_GRE_ENCAP_FLAG_REMCSUM));
+
+	if (!ni_string_empty(ni_string_join(&str, &flags, ", ")))
+		xml_node_new_element("flags", encap, str);
+	ni_string_array_destroy(&flags);
+	ni_string_free(&str);
+
+	if (gre->encap.sport)
+		xml_node_new_element_uint("sport", encap, gre->encap.sport);
+	if (gre->encap.dport)
+		xml_node_new_element_uint("dport", encap, gre->encap.dport);
 
 	return rv;
 }
@@ -1485,6 +1693,127 @@ __ni_compat_generate_static_route_list(xml_node_t *afnode, ni_route_table_t *rou
 }
 
 static void
+__ni_compat_generate_static_rule_match(xml_node_t *rnode, const ni_rule_t *rule, const char *ifname)
+{
+	xml_node_t *node;
+
+	node = xml_node_new("match", NULL);
+
+	if (rule->set & NI_RULE_SET_PREF)
+		xml_node_new_element_uint("priority", node, rule->pref);
+
+	if (rule->flags & NI_BIT(NI_RULE_INVERT))
+		xml_node_new_element("invert", node, "true");
+
+	if (!ni_sockaddr_is_unspecified(&rule->src.addr))
+		xml_node_new_element("from", node,
+			ni_sockaddr_prefix_print(&rule->src.addr, rule->src.len));
+
+	if (!ni_sockaddr_is_unspecified(&rule->dst.addr))
+		xml_node_new_element("to", node,
+			ni_sockaddr_prefix_print(&rule->dst.addr, rule->dst.len));
+
+	if (!ni_string_empty(rule->iif.name))
+		xml_node_new_element("iif", node, rule->iif.name);
+
+	if (!ni_string_empty(rule->oif.name))
+		xml_node_new_element("oif", node, rule->oif.name);
+
+	if (rule->fwmark)
+		xml_node_new_element_uint("fwmark", node, rule->fwmark);
+
+	if (rule->fwmask && rule->fwmask != -1U)
+		xml_node_new_element_uint("fwmask", node, rule->fwmask);
+
+	if (rule->tos)
+		xml_node_new_element_uint("tos", node, rule->tos);
+
+	if (node->children || node->attrs.count || node->cdata)
+		xml_node_add_child(rnode, node);
+	else
+		xml_node_free(node);
+}
+
+static void
+__ni_compat_generate_static_rule_action(xml_node_t *rnode, const ni_rule_t *rule, const char *ifname)
+{
+	xml_node_t *node;
+	char *tmp = NULL;
+
+	node = xml_node_new("action", NULL);
+
+	xml_node_new_element("type", node, ni_rule_action_type_to_name(rule->action));
+
+	if (rule->table != RT_TABLE_UNSPEC && rule->table != RT_TABLE_MAIN) {
+		if (ni_route_table_type_to_name(rule->table, &tmp))
+			xml_node_new_element("table", node, tmp);
+		ni_string_free(&tmp);
+	}
+
+	if (rule->target)
+		xml_node_new_element_uint("target", node, rule->target);
+	if (rule->realm)
+		xml_node_new_element_uint("realm", node, rule->realm);
+
+	if (node->children || node->attrs.count || node->cdata)
+		xml_node_add_child(rnode, node);
+	else
+		xml_node_free(node);
+}
+
+static void
+__ni_compat_generate_static_rule_suppress(xml_node_t *rnode, const ni_rule_t *rule, const char *ifname)
+{
+	xml_node_t *node;
+
+	node = xml_node_new("suppress", NULL);
+
+	if (rule->suppress_prefixlen != -1U)
+		xml_node_new_element_uint("prefix-length", node, rule->suppress_prefixlen);
+
+	if (rule->suppress_ifgroup != -1U)
+		xml_node_new_element_uint("if-group", node, rule->suppress_ifgroup);
+
+	if (node->children || node->attrs.count || node->cdata)
+		xml_node_add_child(rnode, node);
+	else
+		xml_node_free(node);
+}
+
+static void
+__ni_compat_generate_static_rule(xml_node_t *aconf, const ni_rule_t *r, const char *ifname)
+{
+	xml_node_t *rnode;
+
+	if (!aconf || !r || !r->family || !r->action)
+		return;
+
+	if (!(rnode = xml_node_new("rule", aconf)))
+		return;
+
+	__ni_compat_generate_static_rule_match(rnode, r, ifname);
+	__ni_compat_generate_static_rule_action(rnode, r, ifname);
+	__ni_compat_generate_static_rule_suppress(rnode, r, ifname);
+}
+
+static void
+__ni_compat_generate_static_rule_list(xml_node_t *afnode, const ni_rule_array_t *rules, const char *ifname, unsigned int af)
+{
+	const ni_rule_t *r;
+	unsigned int i;
+
+	if (!afnode || !rules || !af)
+		return;
+
+	for (i = 0; i < rules->count; ++i) {
+		r = rules->data[i];
+		if (!r || r->family != af)
+			continue;
+		__ni_compat_generate_static_rule(afnode, r, ifname);
+	}
+}
+
+static void
 __ni_compat_generate_static_address_list(xml_node_t *afnode, ni_address_t *addr_list, unsigned int af)
 {
 	ni_address_t *ap;
@@ -1527,6 +1856,7 @@ __ni_compat_generate_static_addrconf(xml_node_t *ifnode, const ni_compat_netdev_
 
 	__ni_compat_generate_static_address_list(afnode, dev->addrs, af);
 	__ni_compat_generate_static_route_list(afnode, dev->routes, dev->name, af);
+	__ni_compat_generate_static_rule_list(afnode, &compat->rules, dev->name, af);
 
 	if (afnode->children) {
 		xml_node_add_child(ifnode, afnode);
@@ -1857,6 +2187,10 @@ __ni_compat_generate_ifcfg(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 
 	case NI_IFTYPE_BOND:
 		__ni_compat_generate_bonding(ifnode, compat);
+		break;
+
+	case NI_IFTYPE_PPP:
+		__ni_compat_generate_ppp(ifnode, compat);
 		break;
 
 	case NI_IFTYPE_TEAM:

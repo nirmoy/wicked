@@ -323,7 +323,7 @@ ni_string_array_cmp(const ni_string_array_t *la, const ni_string_array_t *ra)
 	int ret;
 
 	if (!la || !ra)
-		return la > ra ? 1 : -1;
+		return la > ra ? 1 : la < ra ? -1 : 0;
 
 	if (la->count != ra->count)
 		return la->count > ra->count ? 1 : -1;
@@ -929,38 +929,48 @@ ni_string_free(char **pp)
 void
 ni_string_clear(char **pp)
 {
-	if (pp && !ni_string_empty(*pp)) {
-		memset(*pp, 0, ni_string_len(*pp));
-		ni_string_free(pp);
-	}
+	if (pp && *pp)
+		memset(*pp, 0, strlen(*pp));
+	ni_string_free(pp);
 }
 
-void
+ni_bool_t
 ni_string_dup(char **pp, const char *value)
 {
 	char *newval;
 
 	/* Beware: dup the string first, then free *pp.
 	 * After all, value may be a substing of *pp */
-	newval = value? xstrdup(value) : NULL;
+	newval = xstrdup(value);
+	if (value && !newval)
+		return FALSE;
 	if (*pp)
 		free(*pp);
 	*pp = newval;
+	return TRUE;
 }
 
-void
-ni_string_set(char **pp, const char *value, unsigned int len)
+ni_bool_t
+ni_string_set(char **pp, const char *value, size_t len)
 {
-	if (*pp) {
-		free(*pp);
-		*pp = NULL;
-	}
+	char *newval = NULL;
+
+	if (!pp || (len && !value))
+		return FALSE;
 
 	if (len) {
-		*pp = xmalloc(len + 1);
-		memcpy(*pp, value, len);
-		(*pp)[len] = '\0';
+		if (len == SIZE_MAX)
+			return FALSE;
+		if (!(newval = xmalloc(len + 1)))
+			return FALSE;
+		memcpy(newval, value, len);
+		newval[len] = '\0';
 	}
+
+	free(*pp);
+	*pp = newval;
+
+	return TRUE;
 }
 
 const char *

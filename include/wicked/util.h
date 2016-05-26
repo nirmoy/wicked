@@ -91,8 +91,8 @@ extern int		ni_bitfield_testbit(const ni_bitfield_t *, unsigned int);
 
 extern void		ni_string_free(char **);
 extern void		ni_string_clear(char **);
-extern void		ni_string_dup(char **, const char *);
-extern void		ni_string_set(char **, const char *, unsigned int len);
+extern ni_bool_t	ni_string_dup(char **, const char *);
+extern ni_bool_t	ni_string_set(char **, const char *, size_t len);
 extern const char *	ni_string_printf(char **, const char *, ...);
 
 extern void		ni_string_array_init(ni_string_array_t *);
@@ -279,7 +279,7 @@ static inline int
 ni_string_cmp(const char *a, const char *b)
 {
 	if (a == NULL || b == NULL)
-		return a > b ? 1 : -1;
+		return a > b ? 1 : a < b ? -1 : 0;
 	else
 		return strcmp(a, b);
 }
@@ -288,7 +288,7 @@ static inline int
 ni_string_cmp_nocase(const char *a, const char *b)
 {
 	if (a == NULL || b == NULL)
-		return a > b ? 1 : -1;
+		return a > b ? 1 : a < b ? -1 : 0;
 	else
 		return strcasecmp(a, b);
 }

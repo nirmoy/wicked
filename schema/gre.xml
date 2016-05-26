@@ -9,11 +9,26 @@
 
  <!-- This are the properties used to configure the gre tunnel -->
  <define name="configuration" class="dict">
+  <device type="string">
+    <meta:netif-reference shared="true"/>
+    <meta:require check="netif-check-state" op="newDevice" min-state="device-up" />
+    <meta:require check="netif-check-state" op="login" min-state="link-authenticated" />
+    <meta:require check="netif-check-state" op="linkUp" min-state="link-up" />
+  </device>
   <local-address   type="ipv4-address"/>
   <remote-address  type="ipv4-address"/>
   <ttl             type="uint16"/>	<!-- u8 from netlink -->
   <tos             type="uint16"/>	<!-- u8 from netlink -->
   <pmtudisc        type="boolean"/>	<!-- u8 from netlink -->
+  <flags           type="builtin-gre-flag-mask"/>
+  <ikey            type="ipv4-address"/>
+  <okey            type="ipv4-address"/>
+  <!-- encap       class="dict">
+    <type          type="builtin-gre-encap-type"/>
+    <flags         type="builtin-gre-encap-flag-mask"/>
+    <sport         type="uint16"/>
+    <dport         type="uint16"/>
+  </encap -->
  </define>
 
  <!-- The same properties are returned in interface state reports -->

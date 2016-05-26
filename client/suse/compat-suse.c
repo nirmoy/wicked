@@ -52,6 +52,7 @@
 #include <wicked/ethernet.h>
 #include <wicked/infiniband.h>
 #include <wicked/bonding.h>
+#include <wicked/ppp.h>
 #include <wicked/team.h>
 #include <wicked/ovs.h>
 #include <wicked/bridge.h>
@@ -516,6 +517,8 @@ __ni_suse_parse_route_hops(ni_route_nexthop_t *nh, ni_string_array_t *opts,
 	while ((opt = ni_string_array_at(opts, (*pos)++))) {
 		if (!strcmp(opt, "nexthop")) {
 			ni_route_nexthop_t *next = ni_route_nexthop_new();
+			if (!next)
+				return -1;
 			if (__ni_suse_parse_route_hops(next, opts, pos, ifname,
 							filename, line) < 0) {
 				ni_route_nexthop_free(next);
@@ -900,7 +903,8 @@ __ni_suse_route_parse(ni_route_table_t **routes, char *buffer, const char *ifnam
 	/*
 	 * Let's allocate a route and fill it directly
 	 */
-	rp = ni_route_new();
+	if (!(rp = ni_route_new()))
+		goto failure;
 
 	/*
 	 * We need an address either in gateway or in destination
@@ -1162,6 +1166,349 @@ error:
 	fclose(fp);
 	return FALSE;
 }
+
+static int
+parse_rule_prefix(ni_rule_prefix_t *prefix, const char *value, unsigned int family)
+{
+	unsigned int len;
+
+	if (!prefix || ni_string_empty(value))
+		return -1;
+
+	if (ni_string_eq(value, "all")) {
+		if (family == AF_INET)
+			value = "0.0.0.0/0";
+		else
+		if (family == AF_INET6)
+			value = "::/0";
+		else
+			return 1;
+	}
+
+	if (!ni_sockaddr_prefix_parse(value, &prefix->addr, &prefix->len))
+		goto cleanup;
+
+	if (family != AF_UNSPEC && family != prefix->addr.ss_family)
+		goto cleanup;
+
+	len = ni_af_address_prefixlen(prefix->addr.ss_family);
+	if (prefix->len >= len)
+		prefix->len = len;
+	else
+	if (!prefix->len && !ni_sockaddr_is_unspecified(&prefix->addr))
+		prefix->len = len;
+
+	return 0;
+cleanup:
+	memset(prefix, 0, sizeof(*prefix));
+	return -1;
+}
+
+static int
+ni_suse_parse_rule(ni_rule_t *rule, ni_string_array_t *opts,
+		const char *filename, unsigned int line)
+{
+	const char *opt, *val;
+	unsigned int pos = 0;
+	unsigned int u32;
+	char *tmp = NULL, *ptr;
+	int ret;
+
+	while ((opt = ni_string_array_at(opts, pos++))) {
+		if (ni_string_eq(opt, "ipv4")) {
+			if (rule->family != AF_UNSPEC && rule->family != AF_INET) {
+				ni_error("%s[%u]: Cannot set multiple routing rule families",
+						filename, line);
+				return -1;
+			}
+			rule->family = AF_INET;
+		}
+		else
+		if (ni_string_eq(opt, "ipv6")) {
+			if (rule->family != AF_UNSPEC && rule->family != AF_INET6) {
+				ni_error("%s[%u]: Cannot set multiple routing rule families",
+						filename, line);
+				return -1;
+			}
+			rule->family = AF_INET6;
+		} else
+		if (ni_string_eq(opt, "not")) {
+			rule->flags |= NI_BIT(NI_RULE_INVERT);
+		} else
+		if (ni_string_eq(opt, "src") || ni_string_eq(opt, "from")) {
+			val = ni_string_array_at(opts, pos++);
+			if ((ret = parse_rule_prefix(&rule->src, val, rule->family)) < 0) {
+				ni_error("%s[%u]: Cannot parse routing rule %s prefix '%s'",
+						filename, line, opt, val);
+				return ret;
+			}
+			if (ret == 0 && rule->family == AF_UNSPEC)
+				rule->family = rule->src.addr.ss_family;
+		} else
+		if (ni_string_eq(opt, "dst") || ni_string_eq(opt, "to")) {
+			val = ni_string_array_at(opts, pos++);
+			if ((ret = parse_rule_prefix(&rule->dst, val, rule->family)) < 0) {
+				ni_error("%s[%u]: Cannot parse routing rule %s prefix '%s'",
+						filename, line, opt, val);
+				return ret;
+			}
+			if (ret == 0 && rule->family == AF_UNSPEC)
+				rule->family = rule->dst.addr.ss_family;
+		} else
+		if (ni_string_eq(opt, "preference") || ni_string_eq(opt, "pref") ||
+		    ni_string_eq(opt, "priority")   || ni_string_eq(opt, "prio")) {
+			val = ni_string_array_at(opts, pos++);
+			if (ni_parse_uint(val, &u32, 0) < 0) {
+				ni_error("%s[%u]: Cannot parse routing rule preference '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->pref = u32;
+			rule->set |= NI_RULE_SET_PREF;
+		} else
+		if (ni_string_eq(opt, "tos") || ni_string_eq(opt, "dsfield")) {
+			val = ni_string_array_at(opts, pos++);
+			if (ni_parse_uint(val, &u32, 16) < 0 || u32 > 255) {
+				ni_error("%s[%u]: Cannot parse routing rule tos '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->tos = u32;
+		} else
+		if (ni_string_eq(opt, "fwmark")) {
+			val = ni_string_array_at(opts, pos++);
+			if (!val || !ni_string_dup(&tmp, val)) {
+				ni_error("%s[%u]: Cannot parse routing rule fwmark value",
+						filename, line);
+				ni_string_free(&tmp);
+				return -1;
+			}
+			if ((ptr = strchr(tmp, '/')))
+				*ptr++ = '\0';
+			if (ni_parse_uint(tmp, &u32, 0) < 0) {
+				ni_error("%s[%u]: Cannot parse routing rule fwmark '%s'",
+						filename, line, val);
+				ni_string_free(&tmp);
+				return -1;
+			}
+			rule->fwmark = u32;
+			if (ptr && ni_parse_uint(ptr, &u32, 0) < 0) {
+				ni_error("%s[%u]: Cannot parse routing rule fwmark mask '%s'",
+						filename, line, ptr);
+				ni_string_free(&tmp);
+				return -1;
+			}
+			rule->fwmask = u32;
+			ni_string_free(&tmp);
+		} else
+		if (ni_string_eq(opt, "realm") || ni_string_eq(opt, "realms")) {
+			val = ni_string_array_at(opts, pos++);
+			if (ni_parse_uint(val, &u32, 0) < 0 || u32 > 255) {
+				ni_error("%s[%u]: Cannot parse routing rule realm '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->realm = u32;
+		} else
+		if (ni_string_eq(opt, "table") || ni_string_eq(opt, "lookup")) {
+			val = ni_string_array_at(opts, pos++);
+			if (!val || !ni_route_table_name_to_type(val, &u32)) {
+				ni_error("%s[%u]: Cannot parse routing rule table '%s'",
+						filename, line, val);
+				ni_string_free(&tmp);
+				return -1;
+			}
+			ni_string_free(&tmp);
+			if (u32 == RT_TABLE_UNSPEC || u32 == RT_TABLE_MAX) {
+				ni_error("%s[%u]: Cannot parse routing rule table '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->table = u32;
+		} else
+		if (ni_string_eq(opt, "suppress-prefixlength") ||
+		    ni_string_eq(opt, "suppress_prefixlength") ||
+		    ni_string_eq(opt, "sup_pl")) {
+			val = ni_string_array_at(opts, pos++);
+			if (ni_parse_uint(val, &u32, 0) < 0 || u32 > INT_MAX) {
+				ni_error("%s[%u]: Cannot parse routing rule prefix length suppressor '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->suppress_prefixlen = u32;
+		} else
+		if (ni_string_eq(opt, "suppress-ifgroup") ||
+		    ni_string_eq(opt, "suppress_ifgroup") ||
+		    ni_string_eq(opt, "sup_group")) {
+			val = ni_string_array_at(opts, pos++);
+			if (ni_parse_uint(val, &u32, 0) < 0 || u32 > INT_MAX) {
+				ni_error("%s[%u]: Cannot parse routing rule ifgroup suppressor '%s'",
+						filename, line, val);
+				return -1;
+			}
+			rule->suppress_ifgroup = u32;
+		} else
+		if (ni_string_eq(opt, "iif") || ni_string_eq(opt, "dev")) {
+			val = ni_string_array_at(opts, pos++);
+			if (!ni_netdev_name_is_valid(val)) {
+				ni_error("%s[%u]: Invalid routing rule input interface '%s'",
+						filename, line, val);
+				return -1;
+			}
+			ni_string_dup(&rule->iif.name, val);
+		} else
+		if (ni_string_eq(opt, "oif")) {
+			val = ni_string_array_at(opts, pos++);
+			if (!ni_netdev_name_is_valid(val)) {
+				ni_error("%s[%u]: Invalid routing rule output interface '%s'",
+						filename, line, val);
+				return -1;
+			}
+			ni_string_dup(&rule->oif.name, val);
+		} else
+		if (ni_string_eq(opt, "nat") || ni_string_eq(opt, "map-to")) {
+			ni_error("%s[%u]: NAT routing rules are not supported any more",
+					filename, line);
+			return -1;
+		} else {
+			if (ni_string_eq(opt, "type")) {
+				opt = ni_string_array_at(opts, pos++);
+				if (ni_string_empty(opt)) {
+					ni_error("%s[%u]: Missed routing rule action type",
+							filename, line);
+					return -1;
+				}
+			}
+
+			if (ni_string_eq(opt, "goto")) {
+				val = ni_string_array_at(opts, pos++);
+				if (ni_parse_uint(val, &u32, 0) < 0) {
+					ni_error("%s[%u]: Cannot parse routing rule goto target '%s'",
+						filename, line, val);
+					return -1;
+				}
+				rule->action = NI_RULE_ACTION_GOTO;
+				rule->target = u32;
+			} else
+			if (ni_string_eq(opt, "nop")) {
+				rule->action = NI_RULE_ACTION_NOP;
+			} else
+			if (ni_string_eq(opt, "blackhole")) {
+				rule->action = NI_RULE_ACTION_BLACKHOLE;
+			} else
+			if (ni_string_eq(opt, "unreachable")) {
+				rule->action = NI_RULE_ACTION_UNREACHABLE;
+			} else
+			if (ni_string_eq(opt, "prohibit")) {
+				rule->action = NI_RULE_ACTION_PROHIBIT;
+			} else {
+				ni_error("%s[%u]: Unknown routing rule option '%s",
+					filename, line, opt);
+				return -1;
+			}
+		}
+	}
+
+	if (rule->family == AF_UNSPEC) {
+		ni_error("%s[%u]: Invalid routing rule without family",
+				filename, line);
+		return -1;
+	}
+
+	if (!rule->action)
+		rule->action = NI_RULE_ACTION_TO_TBL;
+	if (!rule->table)
+		rule->table = RT_TABLE_MAIN;
+
+	return 0;
+}
+
+static int
+ni_suse_parse_rule_line(ni_rule_array_t *rules, char *buffer, const char *ifname,
+			const char *filename, unsigned int line)
+{
+	ni_string_array_t opts = NI_STRING_ARRAY_INIT;
+	ni_stringbuf_t out = NI_STRINGBUF_INIT_DYNAMIC;
+	ni_rule_t *rule;
+	int ret;
+
+	if (!ni_string_split(&opts, buffer, " \t", 0))
+		return 1;
+
+	if (!(rule = ni_rule_new())) {
+		ni_error("%s[%u]: Unable to allocate routing rule structure",
+				filename, line);
+		return -1;
+	}
+
+	if ((ret = ni_suse_parse_rule(rule, &opts, filename, line))) {
+		ni_rule_free(rule);
+		return ret;
+	}
+
+	ni_debug_readwrite("Parsed routing rule: %s", ni_rule_print(&out, rule));
+	ni_stringbuf_destroy(&out);
+	return ni_rule_array_append(rules, rule);
+}
+
+ni_bool_t
+ni_suse_read_rules(ni_rule_array_t *rules, const char *filename, const char *ifname)
+{
+	ni_stringbuf_t buff = NI_STRINGBUF_INIT_DYNAMIC;
+	unsigned int line = 1, lcnt = 0;
+	FILE *fp;
+	int done;
+
+	if ((fp = fopen(filename, "r")) == NULL) {
+		ni_error("unable to open %s: %m", filename);
+		return FALSE;
+	}
+
+	ni_debug_readwrite("ni_suse_read_rules(%s)", filename);
+
+	ni_stringbuf_grow(&buff, 1023);
+	do {
+		ni_stringbuf_truncate(&buff, 0);
+
+		line += lcnt;
+		lcnt = 0;
+
+		done = __ni_suse_read_route_line(fp, &buff, &lcnt);
+		if (done < 0) {
+			ni_error("%s[%u]: Cannot parse rule line continuation",
+				filename, line - 1 + lcnt);
+			goto error;
+		}
+
+		if (ni_stringbuf_empty(&buff))
+			continue;
+
+		/* truncate at first comment char */
+		ni_stringbuf_truncate(&buff, strcspn(buff.string, "#"));
+
+		/* skip leading spaces */
+		ni_stringbuf_trim_head(&buff, " \t");
+
+		if (!ni_stringbuf_empty(&buff)) {
+			ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_READWRITE,
+					"Parsing rule line: %s", buff.string);
+			if (ni_suse_parse_rule_line(rules, buff.string,
+						  ifname, filename, line) < 0)
+				continue;
+		}
+	} while (!done);
+
+	fclose(fp);
+	ni_stringbuf_destroy(&buff);
+	return TRUE;
+
+error:
+	fclose(fp);
+	ni_stringbuf_destroy(&buff);
+	ni_rule_array_destroy(rules);
+	return FALSE;
+}
+
 
 /*
  * Read the configuration of a single interface from a sysconfig file
@@ -3300,6 +3647,218 @@ try_wireless(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 }
 
 /*
+ * Handle provider files
+ */
+static ni_sysconfig_t *
+__ni_suse_read_provider(const char *sibling, const char *provider)
+{
+	const char *filename;
+
+	filename = ni_sibling_path_printf(sibling, "providers/%s", provider);
+	if (ni_string_empty(filename) || !ni_file_exists(filename))
+		return NULL;
+	return ni_sysconfig_read(filename);
+}
+
+static int
+try_pppoe(const ni_sysconfig_t *sc, const ni_sysconfig_t *psc, const char *name, ni_ppp_mode_pppoe_t *pppoe)
+{
+	const char *value;
+
+	if (!sc || !psc || !pppoe || ni_string_empty(name))
+		return -1;
+
+	value = ni_sysconfig_get_value(sc, "DEVICE");
+	if (ni_string_empty(value) || !ni_netdev_name_is_valid(value) ||
+	    !ni_netdev_ref_set_ifname(&pppoe->device, value)) {
+		ni_error("ifcfg-%s: PPPoE config without valid ethernet device name: '%s'", name, value ? value : "");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Handle all sorts of PPP
+ */
+static int
+try_ppp(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
+{
+	ni_netdev_t *dev = compat->dev;
+	ni_sysconfig_t *psc = NULL;
+	const char *value;
+	ni_bool_t bval;
+	ni_ppp_t *ppp;
+	int ret = -1;
+
+	if ((value = ni_sysconfig_get_value(sc, "PPPMODE")) == NULL)
+		return 1;
+
+	if (dev->link.type != NI_IFTYPE_UNKNOWN) {
+		ni_error("ifcfg-%s: %s config contains ppp variables",
+			dev->name, ni_linktype_type_to_name(dev->link.type));
+		goto done;
+	}
+
+	/* just drop old if any */
+	ni_netdev_set_ppp(dev, NULL);
+
+	dev->link.type = NI_IFTYPE_PPP;
+	ppp = ni_netdev_get_ppp(dev);
+
+	if (!ni_ppp_mode_name_to_type(value, &ppp->mode.type)) {
+		ni_error("ifcfg-%s: unsupported ppp mode '%s'", dev->name, value);
+		goto done;
+	}
+
+	if (ni_sysconfig_get_boolean(sc, "PPPDEBUG", &bval))
+		ppp->config.debug = bval;
+
+	value = ni_sysconfig_get_value(sc, "PROVIDER");
+	if (!ni_string_empty(value)) {
+		psc = __ni_suse_read_provider(sc->pathname, value);
+		if (!psc) {
+			ni_error("ifcfg-%s: unable to read provider file '%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	if (!psc) {
+		ni_error("ifcfg-%s: no valid PROVIDER is specified", dev->name);
+		goto done;
+	}
+
+	value = ni_sysconfig_get_value(psc, "DEFAULTROUTE");
+	if (ni_parse_boolean(value, &ppp->config.defaultroute) < 0)
+		ppp->config.defaultroute = TRUE;
+
+	if (ni_sysconfig_get_boolean(psc, "DEMAND", &bval))
+		ppp->config.demand = bval;
+
+	value = ni_sysconfig_get_value(psc, "IDLETIME");
+	if (!ni_string_empty(value) && ni_parse_uint(value, &ppp->config.idle, 10) < 0) {
+		ni_error("ifcfg-%s: unable to parse IDLETIME='%s'", dev->name, value);
+		goto done;
+	}
+
+	ni_string_dup(&ppp->config.auth.username, ni_sysconfig_get_value(psc, "USERNAME"));
+	ni_string_dup(&ppp->config.auth.password, ni_sysconfig_get_value(psc, "PASSWORD"));
+	ni_string_dup(&ppp->config.auth.hostname, ni_sysconfig_get_value(psc, "HOSTNAME"));
+
+	value = ni_sysconfig_get_value(psc, "AUTODNS");
+	if (ni_parse_boolean(value, &ppp->config.dns.usepeerdns) < 0)
+		ppp->config.dns.usepeerdns = TRUE;
+
+	value = ni_sysconfig_get_value(psc, "DNS1");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.dns.dns1, value, AF_INET) < 0) {
+			ni_error("ifcfg-%s: unable to parse DNS1='%s'", dev->name, value);
+			goto done;
+		}
+	}
+	value = ni_sysconfig_get_value(psc, "DNS2");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.dns.dns2, value, AF_INET) < 0) {
+			ni_error("ifcfg-%s: unable to parse DNS2='%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	value = ni_sysconfig_get_value(psc, "MODIFYIP");
+	if (ni_parse_boolean(value, &bval) == 0) {
+		ppp->config.ipv4.ipcp.accept_local = bval;
+		ppp->config.ipv4.ipcp.accept_remote = bval;
+		ppp->config.ipv6.ipcp.accept_local = bval;
+	}
+	value = ni_sysconfig_get_value(psc, "MODIFYIP6");
+	if (ni_parse_boolean(value, &bval) == 0)
+		ppp->config.ipv6.ipcp.accept_local = bval;
+
+	value = ni_sysconfig_get_value(psc, "IPADDR");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.ipv4.local_ip, value, AF_INET) < 0) {
+			ni_error("ifcfg-%s: unable to parse IPADDR='%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	value = ni_sysconfig_get_value(psc, "REMOTE_IPADDR");
+	if (ni_string_empty(value))
+		value = ni_sysconfig_get_value(psc, "PTPADDR");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.ipv4.remote_ip, value, AF_INET) < 0) {
+			ni_error("ifcfg-%s: unable to parse REMOTE_IPADDR/PTPADDR='%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	value = ni_sysconfig_get_value(psc, "IPADDR6");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.ipv6.local_ip, value, AF_INET6) < 0) {
+			ni_error("ifcfg-%s: unable to parse IPADDR6='%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	value = ni_sysconfig_get_value(psc, "REMOTE_IPADDR6");
+	if (ni_string_empty(value))
+		value = ni_sysconfig_get_value(psc, "PTPADDR6");
+	if (!ni_string_empty(value)) {
+		if (ni_sockaddr_parse(&ppp->config.ipv6.remote_ip, value, AF_INET6) < 0) {
+			ni_error("ifcfg-%s: unable to parse REMOTE_IPADDR6/PTPADDR6='%s'", dev->name, value);
+			goto done;
+		}
+	}
+
+	if (ni_sysconfig_get_boolean(psc, "MULTILINK", &bval))
+		ppp->config.multilink = bval;
+	ni_string_dup(&ppp->config.endpoint, ni_sysconfig_get_value(psc, "ENDPOINT"));
+
+	if (ni_sysconfig_get_boolean(psc, "AUTO_RECONNECT", &bval))
+		ppp->config.persist = bval;
+
+	value = ni_sysconfig_get_value(psc, "AUTO_RECONNECT_DELAY");
+	if (!ni_string_empty(value) && ni_parse_uint(value, &ppp->config.holdoff, 10) < 0) {
+		ni_error("ifcfg-%s: unable to parse AUTO_RECONNECT_DELAY='%s'", dev->name, value);
+		goto done;
+	}
+
+	value = ni_sysconfig_get_value(psc, "MAXFAIL");
+	if (!ni_string_empty(value) && ni_parse_uint(value, &ppp->config.maxfail, 10) < 0) {
+		ni_error("ifcfg-%s: unable to parse MAXFAIL='%s'", dev->name, value);
+		goto done;
+	}
+
+	ret = 0;
+	switch (ppp->mode.type) {
+	case NI_PPP_MODE_PPPOE:
+		ret = try_pppoe(sc, psc, dev->name, &ppp->mode.pppoe);
+		break;
+	case NI_PPP_MODE_PPPOATM:
+		/* PPPoATM support is not implemented */
+		break;
+	case NI_PPP_MODE_PPTP:
+		/* PPTP support is not implemented */
+		break;
+	case NI_PPP_MODE_ISDN:
+		/* ISDN support is not implemented */
+		break;
+	case NI_PPP_MODE_SERIAL:
+		/* PPP SERIAL support is not implemented */
+		break;
+	default:
+		/* should not happen */
+		ret = -1;
+		break;
+	}
+
+done:
+	if (psc)
+		ni_sysconfig_destroy(psc);
+	return ret;
+}
+
+/*
  * Handle Tunnel interfaces
  */
 static int
@@ -3355,6 +3914,20 @@ __try_tunnel_generic(const char *ifname, unsigned short arp_type,
 {
 	const char *value = NULL;
 	unsigned int ui_value;
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_DEVICE"))) {
+		if (!ni_netdev_name_is_valid(value)) {
+			ni_error("ifcfg-%s: TUNNEL_DEVICE=\"%s\" suspect interface name",
+					ifname, value);
+			return -1;
+		}
+		if (ni_string_eq(value, ifname)) {
+			ni_error("ifcfg-%s: TUNNEL_DEVICE=\"%s\" invalid self-reference",
+					ifname, value);
+			return -1;
+		}
+		ni_string_dup(&link->lowerdev.name, value);
+	}
 
 	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_LOCAL_IPADDR"))) {
 		if (ni_link_address_parse(&link->hwaddr, arp_type, value) < 0) {
@@ -3429,8 +4002,12 @@ __try_tunnel_ipip(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 static int
 __try_tunnel_gre(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 {
+	ni_string_array_t flags = NI_STRING_ARRAY_INIT;
 	ni_netdev_t *dev = compat->dev;
 	ni_gre_t *gre = NULL;
+	ni_sockaddr_t addr;
+	const char *value;
+	unsigned int flag, i;
 	int rv = 0;
 
 	if (!(gre = ni_netdev_get_gre(dev)))
@@ -3439,6 +4016,91 @@ __try_tunnel_gre(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 	/* Populate generic tunneling data from config. */
 	rv = __try_tunnel_generic(dev->name, ARPHRD_IPGRE, &dev->link,
 				&gre->tunnel, sc, compat);
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_FLAGS"))) {
+		ni_string_split(&flags, value, " \t", 0);
+		for (i = 0; i < flags.count; ++i) {
+			if (!ni_gre_flag_name_to_bit(flags.data[i], &flag)) {
+				ni_error("ifcfg-%s: Unsupported TUNNEL_GRE_FLAGS=\"%s\"",
+						dev->name, flags.data[i]);
+				ni_string_array_destroy(&flags);
+				return -1;
+			}
+			gre->flags |= NI_BIT(flag);
+		}
+		ni_string_array_destroy(&flags);
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_IKEY"))) {
+		if (strchr(value, '.') && ni_sockaddr_parse(&addr, value, AF_INET) == 0) {
+			gre->ikey.s_addr = addr.sin.sin_addr.s_addr;
+			gre->flags |= NI_BIT(NI_GRE_FLAG_IKEY);
+		} else
+		if (ni_parse_uint(value, &flag, 10) == 0) {
+			gre->ikey.s_addr = htons(flag);
+			gre->flags |= NI_BIT(NI_GRE_FLAG_IKEY);
+		} else {
+			ni_error("ifcfg-%s: Cannot parse TUNNEL_GRE_IKEY=\"%s\"",
+					dev->name, value);
+			return -1;
+		}
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_OKEY"))) {
+		if (strchr(value, '.') && ni_sockaddr_parse(&addr, value, AF_INET) == 0) {
+			gre->okey.s_addr = addr.sin.sin_addr.s_addr;
+			gre->flags |= NI_BIT(NI_GRE_FLAG_OKEY);
+		} else
+		if (ni_parse_uint(value, &flag, 10) == 0) {
+			gre->okey.s_addr = htons(flag);
+			gre->flags |= NI_BIT(NI_GRE_FLAG_OKEY);
+		} else {
+			ni_error("ifcfg-%s: Cannot parse TUNNEL_GRE_OKEY=\"%s\"",
+					dev->name, value);
+			return -1;
+		}
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_ENCAP_TYPE"))) {
+		if (!ni_gre_encap_name_to_type(value, &flag)) {
+			ni_error("ifcfg-%s: Unsupported TUNNEL_GRE_ENCAP_TYPE=\"%s\"",
+					dev->name, value);
+			return -1;
+		}
+		gre->encap.type = flag;
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_ENCAP_FLAGS"))) {
+		ni_string_split(&flags, value, " \t", 0);
+		for (i = 0; i < flags.count; ++i) {
+			if (!ni_gre_encap_flag_name_to_bit(flags.data[i], &flag)) {
+				ni_error("ifcfg-%s: Unsupported TUNNEL_GRE_ENCAP_FLAGS=\"%s\"",
+						dev->name, flags.data[i]);
+				ni_string_array_destroy(&flags);
+				return -1;
+			}
+			gre->encap.flags |= NI_BIT(flag);
+		}
+		ni_string_array_destroy(&flags);
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_ENCAP_SPORT"))) {
+		if (ni_parse_uint(value, &flag, 10) < 0 || flag > USHRT_MAX) {
+			ni_error("ifcfg-%s: Cannot parse TUNNEL_GRE_ENCAP_SPORT=\"%s\"",
+					dev->name, value);
+			return -1;
+		}
+		gre->encap.sport = flag;
+	}
+
+	if ((value = ni_sysconfig_get_value(sc, "TUNNEL_GRE_ENCAP_DPORT"))) {
+		if (ni_parse_uint(value, &flag, 10) < 0 || flag > USHRT_MAX) {
+			ni_error("ifcfg-%s: Cannot parse TUNNEL_GRE_ENCAP_DPORT=\"%s\"",
+					dev->name, value);
+			return -1;
+		}
+		gre->encap.dport = flag;
+	}
 
 	return rv;
 }
@@ -3675,6 +4337,7 @@ __ni_suse_addrconf_static(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 	ni_bool_t ipv4_enabled = TRUE;
 	ni_bool_t ipv6_enabled = TRUE;
 	const char *routespath;
+	const char *rulespath;
 	ni_stringbuf_t out = NI_STRINGBUF_INIT_DYNAMIC;
 
 	if (dev->ipv4 && ni_tristate_is_disabled(dev->ipv4->conf.enabled))
@@ -3721,6 +4384,11 @@ __ni_suse_addrconf_static(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 	routespath = ni_sibling_path_printf(sc->pathname, "ifroute-%s", dev->name);
 	if (routespath && ni_file_exists(routespath)) {
 		__ni_suse_read_routes(&dev->routes, routespath, dev->name);
+	}
+
+	rulespath = ni_sibling_path_printf(sc->pathname, "ifrule-%s", dev->name);
+	if (rulespath && ni_file_exists(rulespath)) {
+		ni_suse_read_rules(&compat->rules, rulespath, dev->name);
 	}
 
 	if (__ni_suse_global_routes) {
@@ -4134,10 +4802,13 @@ __ni_suse_bootproto(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 	ni_ipv4_devinfo_t *ipv4;
 	ni_ipv6_devinfo_t *ipv6;
 
-	if ((bootproto = ni_sysconfig_get_value(sc, "BOOTPROTO")) == NULL)
-		bootproto = "static";
-	else if (!bootproto[0] || ni_string_eq(dev->name, "lo"))
-		bootproto = "static";
+	bootproto = ni_sysconfig_get_value(sc, "BOOTPROTO");
+	if (ni_string_empty(bootproto) || ni_string_eq(dev->name, "lo")) {
+		if (dev->link.type == NI_IFTYPE_PPP)
+			bootproto = "ppp";
+		else
+			bootproto = "static";
+	}
 
 	ipv4 = ni_netdev_get_ipv4(dev);
 	ipv6 = ni_netdev_get_ipv6(dev);
@@ -4170,6 +4841,12 @@ __ni_suse_bootproto(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 			ni_tristate_set(&ipv4->conf.arp_notify, ni_string_eq(value, "yes"));
 		}
 	}
+
+	if (dev->link.type == NI_IFTYPE_PPP && dev->ppp && !ipv6->conf.enabled)
+		dev->ppp->config.ipv6.enabled = FALSE;
+
+	if (ni_string_eq_nocase(bootproto, "ppp"))
+		return TRUE;
 
 	/* Hmm... ignore this config completely -> ibft firmware */
 	if (ni_string_eq_nocase(bootproto, "ibft")) {
@@ -4815,6 +5492,7 @@ __ni_suse_sysconfig_read(ni_sysconfig_t *sc, ni_compat_netdev_t *compat)
 	    try_macvlan(sc, compat)    < 0 ||
 	    try_dummy(sc, compat)      < 0 ||
 	    try_tunnel(sc, compat)     < 0 ||
+	    try_ppp(sc, compat)        < 0 ||
 	    try_wireless(sc, compat)   < 0 ||
 	    try_infiniband(sc, compat) < 0 ||
 	    /* keep ethernet the last one */

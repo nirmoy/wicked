@@ -23,6 +23,7 @@ generated			= \
 	ifcfg-macvlan.5		\
 	ifcfg-macvtap.5		\
 	ifcfg-ovs-bridge.5	\
+	ifcfg-ppp.5		\
 	ifcfg-team.5		\
 	ifcfg-tunnel.5		\
 	ifcfg-vlan.5		\
@@ -30,6 +31,7 @@ generated			= \
 	ifcfg.5			\
 	ifcfg-dhcp.5		\
 	ifroute.5		\
+	ifrule.5		\
 	ifsysctl.5		\
 	ifdown.8		\
 	ifstatus.8		\

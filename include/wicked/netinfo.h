@@ -135,11 +135,15 @@ extern int		ni_server_listen_interface_events(void (*handler)(ni_netdev_t *, ni_
 extern int		ni_server_enable_interface_addr_events(void (*handler)(ni_netdev_t *, ni_event_t, const ni_address_t *));
 extern int		ni_server_enable_interface_prefix_events(void (*handler)(ni_netdev_t *, ni_event_t, const ni_ipv6_ra_pinfo_t *));
 extern int		ni_server_enable_interface_nduseropt_events(void (*handler)(ni_netdev_t *, ni_event_t));
+extern int		ni_server_enable_route_events(void (*handler)(ni_netconfig_t *, ni_event_t, const ni_route_t *));
+extern int		ni_server_enable_rule_events(void (*handler)(ni_netconfig_t *, ni_event_t, const ni_rule_t *));
 extern int		ni_server_enable_interface_uevents(void);
 extern void		ni_server_disable_interface_uevents(void);
 extern void		ni_server_trace_interface_addr_events(ni_netdev_t *, ni_event_t, const ni_address_t *);
 extern void		ni_server_trace_interface_prefix_events(ni_netdev_t *, ni_event_t, const ni_ipv6_ra_pinfo_t *);
 extern void		ni_server_trace_interface_nduseropt_events(ni_netdev_t *, ni_event_t);
+extern void		ni_server_trace_route_events(ni_netconfig_t *, ni_event_t, const ni_route_t *);
+extern void		ni_server_trace_rule_events(ni_netconfig_t *, ni_event_t, const ni_rule_t *);
 extern void		ni_server_deactivate_interface_events(void);
 extern void		ni_server_deactivate_interface_uevents(void);
 extern ni_bool_t	ni_server_disabled_uevents(void);
@@ -172,6 +176,7 @@ extern ni_netdev_t *	ni_netdev_by_index(ni_netconfig_t *nic, unsigned int index)
 extern ni_netdev_t *	ni_netdev_by_hwaddr(ni_netconfig_t *nic, const ni_hwaddr_t *lla);
 extern ni_netdev_t *	ni_netdev_by_vlan_name_and_tag(ni_netconfig_t *nc,
 				const char *physdev, uint16_t tag);
+extern unsigned int	ni_netdev_name_to_index(const char *);
 extern const char *	ni_netdev_make_name(ni_netconfig_t *, const char *, unsigned int);
 
 extern ni_netdev_t *	ni_netdev_new(const char *name, unsigned int ifindex);
@@ -185,16 +190,6 @@ extern int		ni_netdev_unset_lease(ni_netdev_t *, unsigned int af, ni_addrconf_mo
 ni_addrconf_lease_t *	ni_netdev_get_lease(ni_netdev_t *, unsigned int, ni_addrconf_mode_t);
 ni_addrconf_lease_t *	ni_netdev_get_lease_by_uuid(ni_netdev_t *, const ni_uuid_t *);
 ni_addrconf_lease_t *	ni_netdev_get_lease_by_owner(ni_netdev_t *, const char *);
-
-extern ni_route_t *	ni_netdev_add_route(ni_netdev_t *,
-				unsigned int prefix_len,
-				const ni_sockaddr_t *dest,
-				const ni_sockaddr_t *gw,
-				unsigned int table);
-
-extern ni_address_t *	ni_netdev_add_address(ni_netdev_t *ifp, unsigned int af,
-				unsigned int prefix_len,
-				const ni_sockaddr_t *local_addr);
 
 extern ni_address_t *	ni_netdev_get_addresses(ni_netdev_t *, unsigned int af);
 extern ni_ethernet_t *	ni_netdev_get_ethernet(ni_netdev_t *);

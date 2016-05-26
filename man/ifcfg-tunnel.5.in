@@ -59,8 +59,6 @@ Here you have to set the tunnel protocol. This may be "sit" for IPv6 over IPv4
 tunnel, "gre" for universal IPv4 tunnel, "ipip" for IPv4 over IPv4 tunnel and
 "tap" or "tun" for the user space program driven tunnels.
 .TP
-.\"TODO: do we wish to support TUNNEL_DEVICE?
-.\".BR TUNNEL_LOCAL_IPADDR \ or \ TUNNEL_DEVICE
 .BR TUNNEL_LOCAL_IPADDR
 The address of the local tunnel's end must be directly specified in
 .B TUNNEL_LOCAL_IPADDR
@@ -77,6 +75,11 @@ variable. The address must be present on an existing interface of this host.
 .TP
 .B TUNNEL_REMOTE_IPADDR
 The address of the remote tunnel's end.
+.TP
+.BR TUNNEL_DEVICE
+Permits to specify an optional device name, to bind the tunnel to the device,
+so that tunneled packets will only be routed via this device and will not be
+able to escape to usable routes available on another devices.
 .TP
 .B TUNNEL_TTL
 Specify the
@@ -96,6 +99,28 @@ Enable or disable the
 on this tunnel. PMTU discovery is disabled by default. Note that a fixed TTL is
 incompatible with this option: tunnelling with a fixed TTL always makes PMTU
 discovery.
+.TP
+.B TUNNEL_GRE_FLAGS <iseq | oseq | icsum | ocsum>
+Permits to specify a space separated list of flags to enable sequencing and
+checksums for incomming and outgoing tunneled packets.
+.TP
+.B TUNNEL_GRE_IKEY <key>
+.TP
+.B TUNNEL_GRE_OKEY <key>
+Permits to use of keyed GRE using the specified key for incomming and outgoing
+tunneled packets in IPv4 dotted quad IP address notation or as a number.
+.\".TP
+.\".B TUNNEL_GRE_ENCAP_TYPE <fou | gue>
+.\"Permits to specify encapsulation mode "foo-over UDP" (fou) or "Generic UDP
+.\"Encapsulation" (gue).
+.\".TP
+.\".B TUNNEL_GRE_ENCAP_FLAGS <csum | csum6 | remcsum>
+.\"Permits to specify encapsulation checksum type.
+.\".TP
+.\".B TUNNEL_GRE_ENCAP_SPORT <port>
+.\".TP
+.\".B TUNNEL_GRE_ENCAP_DPORT <port>
+.\"Permits to specify encapsulation source and destination port numbers.
 .TP
 .B SIT_ISATAP
 Applicable only to SIT tunnels. Enable or disable this variable to control

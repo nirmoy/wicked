@@ -549,6 +549,35 @@ __ni_sockaddr_data(const ni_sockaddr_t *ss, unsigned int *len)
 	return ((const unsigned char *) ss) + offset;
 }
 
+int
+ni_sockaddr_compare(const ni_sockaddr_t *ss1, const ni_sockaddr_t *ss2)
+{
+	const unsigned char *ap1, *ap2;
+	unsigned int len1, len2;
+
+	if (!ss1 || !ss2)
+		return ss1 > ss2 ? 1 : ss1 < ss2 ? -1 : 0;
+
+	if (ss1->ss_family != ss2->ss_family)
+		return ss1->ss_family - ss2->ss_family;
+
+	if (ss1->ss_family == AF_UNSPEC)
+		return 0;
+
+	ap1 = __ni_sockaddr_data(ss1, &len1);
+	ap2 = __ni_sockaddr_data(ss2, &len2);
+	if (!ap1 || !ap2)
+		return ap1 > ap2 ? 1 : ap1 < ap2 ? -1 : 0;
+
+	if (len1 != len2)
+		return len1 > len2 ? 1 : -1;
+
+	if (len1 == 0)
+		return 0;
+
+	return memcmp(ap1, ap2, len1);
+}
+
 ni_bool_t
 ni_sockaddr_equal(const ni_sockaddr_t *ss1, const ni_sockaddr_t *ss2)
 {
@@ -1155,6 +1184,7 @@ ni_link_address_is_invalid(const ni_hwaddr_t *hwa)
 		return TRUE;
 
 	case ARPHRD_NONE:
+	case ARPHRD_PPP:
 		return hwa->len != 0;
 
 	case ARPHRD_INFINIBAND:
@@ -1195,7 +1225,7 @@ ni_ipv6_cache_info_rebase(ni_ipv6_cache_info_t *res, const ni_ipv6_cache_info_t 
 
 	*res = *lft;
 
-	if (!timerisset(&lft->since))
+	if (!timerisset(&lft->acquired))
 		return;
 
 	if (lft->valid_lft == -1U && lft->preferred_lft == -1U)
@@ -1206,11 +1236,11 @@ ni_ipv6_cache_info_rebase(ni_ipv6_cache_info_t *res, const ni_ipv6_cache_info_t 
 	else
 		now = *base;
 
-	if (!timercmp(&now, &lft->since, >))
+	if (!timercmp(&now, &lft->acquired, >))
 		return;
-	timersub(&now, &lft->since, &dif);
+	timersub(&now, &lft->acquired, &dif);
 
-	res->since = now;
+	res->acquired = now;
 	if (res->valid_lft == -1U)
 		rebase_lft(res->preferred_lft, (unsigned long)dif.tv_sec);
 	else

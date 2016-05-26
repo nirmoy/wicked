@@ -11,6 +11,7 @@
 #include <netlink/netlink.h>
 #include <netlink/netlink.h>
 #include <linux/ethtool.h>
+#include <linux/fib_rules.h>
 
 #define __user /* unclean header file */
 #include <wireless.h>
@@ -62,8 +63,6 @@ extern int		__ni_wireless_get_name(const char *, char *, size_t);
 extern int		__ni_wireless_get_essid(const char *, char *, size_t);
 
 extern int		__ni_tuntap_create(const ni_netdev_t *);
-
-extern char *		__ni_ppp_create_device(ni_ppp_t *, const char *);
 
 extern int		__ni_netdev_rename(const char *old_name, const char *new_name);
 extern int		__ni_rtnl_link_rename(unsigned int ifindex, const char *oldname, const char *newname);
@@ -119,6 +118,12 @@ ni_rtnl_rtmsg(struct nlmsghdr *h, int expected_type)
 	return __ni_rtnl_msgdata(h, expected_type, sizeof(struct rtmsg));
 }
 
+static inline struct fib_rule_hdr *
+ni_rtnl_fibrulemsg(struct nlmsghdr *h, int expected_type)
+{
+	return __ni_rtnl_msgdata(h, expected_type, sizeof(struct fib_rule_hdr));
+}
+
 static inline struct prefixmsg *
 ni_rtnl_prefixmsg(struct nlmsghdr *h, int expected_type)
 {
@@ -130,6 +135,10 @@ ni_rtnl_nduseroptmsg(struct nlmsghdr *h, int expected_type)
 {
 	return __ni_rtnl_msgdata(h, expected_type, sizeof(struct nduseroptmsg));
 }
+
+extern ni_bool_t	ni_rtnl_route_filter_msg(struct rtmsg *);
+extern int	ni_rtnl_route_parse_msg(struct nlmsghdr *, struct rtmsg *, ni_route_t *);
+extern int	ni_rtnl_rule_parse_msg(struct nlmsghdr *, struct fib_rule_hdr *, ni_rule_t *);
 
 extern int	__ni_rtnl_parse_newaddr(unsigned, struct nlmsghdr *, struct ifaddrmsg *, ni_address_t *);
 extern int	__ni_rtnl_parse_newprefix(const char *, struct nlmsghdr *, struct prefixmsg *, ni_ipv6_ra_pinfo_t *);

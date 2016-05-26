@@ -87,6 +87,7 @@ libwicked_la_SOURCES		= \
 	openvpn.c		\
 	ovs.c			\
 	ppp.c			\
+	pppd.c			\
 	process.c		\
 	resolver.c		\
 	rfkill.c		\
@@ -96,6 +97,7 @@ libwicked_la_SOURCES		= \
 	state.c			\
 	sysconfig.c		\
 	sysfs.c			\
+	systemctl.c		\
 	team.c			\
 	teamd.c			\
 	timer.c			\
@@ -173,6 +175,7 @@ noinst_HEADERS			= \
 system_headers			= \
 	linux/dcbnl.h		\
 	linux/ethtool.h		\
+	linux/if_addr.h		\
 	linux/if_link.h		\
 	linux/if_tunnel.h
 
@@ -211,9 +214,11 @@ wicked_headers			= \
 	modprobe.h		\
 	netinfo_priv.h		\
 	ovs.h			\
+	pppd.h			\
 	process.h		\
 	socket_priv.h		\
 	sysfs.h			\
+	systemctl.h		\
 	teamd.h			\
 	uevent.h		\
 	udev-utils.h		\
