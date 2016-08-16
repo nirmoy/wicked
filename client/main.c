@@ -391,7 +391,7 @@ struct ni_dbus_dict_entry {
 	ni_dbus_variant_t       datum;
 };
 
-static void	__dump_fake_xml(const ni_dbus_variant_t *, unsigned int, const char **);
+static void	__dump_fake_xml(const ni_dbus_variant_t *, unsigned int, const char **, ni_string_array_t *);
 
 static const char *
 __fake_dbus_scalar_type(unsigned int type)
@@ -468,13 +468,13 @@ __dump_fake_xml_element(const ni_dbus_variant_t *var, unsigned int indent,
 				close_tag);
 	} else {
 		printf("%*.*s<%s>\n", indent, indent, "", open_tag);
-		__dump_fake_xml(var, indent + 2, dict_elements);
+		__dump_fake_xml(var, indent + 2, dict_elements, NULL);
 		printf("%*.*s</%s>\n", indent, indent, "", close_tag);
 	}
 }
 
 static void
-__dump_fake_xml(const ni_dbus_variant_t *variant, unsigned int indent, const char **dict_elements)
+__dump_fake_xml(const ni_dbus_variant_t *variant, unsigned int indent, const char **dict_elements, ni_string_array_t *ifnames)
 {
 	ni_dbus_dict_entry_t *entry;
 	unsigned int index;
@@ -489,6 +489,17 @@ __dump_fake_xml(const ni_dbus_variant_t *variant, unsigned int indent, const cha
 			const char *open_tag, *close_tag;
 			char namebuf[256];
 
+			if (index != 0 && ifnames && ifnames->count != 0) {
+				ni_dbus_object_t *object;
+
+				object = get_netif_object(entry->key);
+				if (object) {
+					ni_netdev_t *dev = ni_objectmodel_unwrap_netif(object, NULL);
+					if (ni_string_array_index(ifnames, dev->name) < 0)
+						continue;
+				}
+			}
+
 			if (dict_element_tag) {
 				snprintf(namebuf, sizeof(namebuf), "%s name=\"%s\"", dict_element_tag, entry->key);
 				open_tag = namebuf;
@@ -496,7 +507,6 @@ __dump_fake_xml(const ni_dbus_variant_t *variant, unsigned int indent, const cha
 			} else {
 				open_tag = close_tag = entry->key;
 			}
-
 			__dump_fake_xml_element(child, indent, open_tag, close_tag, dict_elements);
 		}
 	} else if (ni_dbus_variant_is_dict_array(variant)) {
@@ -504,7 +514,7 @@ __dump_fake_xml(const ni_dbus_variant_t *variant, unsigned int indent, const cha
 
 		for (child = variant->variant_array_value, index = 0; index < variant->array.len; ++index, ++child) {
 			printf("%*.*s<e>\n", indent, indent, "");
-			__dump_fake_xml(child, indent + 2, NULL);
+			__dump_fake_xml(child, indent + 2, NULL, NULL);
 			printf("%*.*s</e>\n", indent, indent, "");
 		}
 	} else {
@@ -542,7 +552,7 @@ __dump_object_xml(const char *object_path, const ni_dbus_variant_t *variant, ni_
 }
 
 static xml_node_t *
-__dump_schema_xml(const ni_dbus_variant_t *variant, ni_xs_scope_t *schema)
+__dump_schema_xml(const ni_dbus_variant_t *variant, ni_xs_scope_t *schema, ni_string_array_t *ifnames)
 {
 	xml_node_t *root = xml_node_new(NULL, NULL);
 	ni_dbus_dict_entry_t *entry;
@@ -554,6 +564,19 @@ __dump_schema_xml(const ni_dbus_variant_t *variant, ni_xs_scope_t *schema)
 	}
 
 	for (entry = variant->dict_array_value, index = 0; index < variant->array.len; ++index, ++entry) {
+
+		if (index != 0 && ifnames && ifnames->count != 0) {
+			ni_dbus_object_t *object;
+
+			object = get_netif_object(entry->key);
+			if (object) {
+				ni_netdev_t *dev = ni_objectmodel_unwrap_netif(object, NULL);
+				if (ni_string_array_index(ifnames, dev->name) < 0)
+					continue;
+			}
+		}
+
+
 		if (!__dump_object_xml(entry->key, &entry->datum, schema, root))
 			return NULL;
 	}
@@ -581,6 +604,7 @@ do_show_xml(int argc, char **argv)
 	};
 	ni_dbus_object_t *list_object, *object;
 	ni_dbus_variant_t result = NI_DBUS_VARIANT_INIT;
+	ni_string_array_t ifnames = NI_STRING_ARRAY_INIT;
 	DBusError error = DBUS_ERROR_INIT;
 	const char *ifname = NULL;
 	int opt_raw = FALSE;
@@ -620,14 +644,6 @@ do_show_xml(int argc, char **argv)
 			return 1;
 		}
 	}
-
-	if (optind < argc)
-		ifname = argv[optind++];
-	(void)ifname; /* FIXME; not used yet */
-
-	if (optind != argc)
-		goto usage;
-
 	if (!(object = ni_call_create_client()))
 		return 1;
 #ifdef MODEM
@@ -650,17 +666,37 @@ do_show_xml(int argc, char **argv)
 		goto out;
 	}
 
+	for (;optind < argc; ++optind) {
+		ifname = argv[optind];
+
+		if (ni_string_eq(ifname, "all") ||
+		    ni_string_empty(ifname)) {
+			ni_string_array_destroy(&ifnames);
+			break;
+		}
+
+		if (get_netif_object(ifname) == NULL) {
+			continue;
+		}
+
+		if (ni_string_array_index(&ifnames, ifname) < 0)
+			ni_string_array_append(&ifnames, ifname);
+	}
+
+	if (ifnames.count == 0 && !ni_string_eq(ifname, "all"))
+		goto out;
+
 	if (opt_raw) {
 		static const char *dict_element_tags[] = {
 			"object", "interface", NULL
 		};
 
-		__dump_fake_xml(&result, 0, dict_element_tags);
+		__dump_fake_xml(&result, 0, dict_element_tags, &ifnames);
 	} else {
 		ni_xs_scope_t *schema = ni_objectmodel_init(NULL);
 		xml_node_t *tree;
 
-		tree = __dump_schema_xml(&result, schema);
+		tree = __dump_schema_xml(&result, schema, &ifnames);
 		if (tree == NULL) {
 			ni_error("unable to represent properties as xml");
 			goto out;
