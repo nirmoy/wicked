@@ -680,17 +680,21 @@ out:
 int
 do_show_config(int argc, char **argv, const char *root_schema)
 {
-	enum { OPT_HELP, OPT_RAW, OPT_OUTPUT };
+	enum { OPT_HELP, OPT_RAW, OPT_OUTPUT, OPT_IFCONFIG};
 	static struct option options[] = {
 		{ "help",	no_argument, NULL, OPT_HELP },
 		{ "raw",	no_argument, NULL, OPT_RAW},
 		{ "output",     required_argument, NULL, OPT_OUTPUT },
+		{ "ifconfig",   required_argument, NULL, OPT_IFCONFIG },
 		{ NULL }
 	};
 
 	xml_document_array_t docs = XML_DOCUMENT_ARRAY_INIT;
+	ni_string_array_t opt_ifconfig = NI_STRING_ARRAY_INIT;
+	ni_string_array_t ifnames = NI_STRING_ARRAY_INIT;
 	ni_bool_t opt_raw = FALSE;
 	const char *opt_output = NULL;
+	FILE *fp = NULL;
 	unsigned i;
 	int c;
 
@@ -705,11 +709,15 @@ do_show_config(int argc, char **argv, const char *root_schema)
 			opt_output = optarg;
 			break;
 
+		case OPT_IFCONFIG:
+			ni_string_array_append(&opt_ifconfig, optarg);
+			break;
+
 		default:
 		case OPT_HELP:
 			fprintf(stderr,
-				"wicked [options] show-config [options] [SOURCE...]\n"
-				"Where SOURCE is one of the following:\n"
+				"wicked show-config [--raw] [--ifconfig <source>][<ifname ...>|all]\n"
+				"Where source is one of the following:\n"
 				"\t'firmware:'\n"
 				"\t'compat:'\n"
 				"\t'wicked:[PATH]'\n"
@@ -722,27 +730,50 @@ do_show_config(int argc, char **argv, const char *root_schema)
 				"      Do not display <client-state> tags\n"
 				"  --output <path>\n"
 				"      Specify output file\n"
+				"  --ifconfig <source>\n"
+				"      Specify source to use\n"
 				);
 			return 1;
 		}
 	}
 
-	if (optind == argc) {
-		/* Print all */
-		const ni_string_array_t *cs_array = ni_config_sources("ifconfig");
-		ni_assert(cs_array);
+	for (c = optind; c < argc; ++c) {
+		if (strchr(argv[c], ':'))
+			ni_string_array_append(&opt_ifconfig, argv[c]);
+	}
 
-		for (i = 0; i < cs_array->count; i++) {
-			if (!root_schema || !strcmp(root_schema, cs_array->data[i])) {
-				if (!ni_ifconfig_read(&docs, opt_global_rootdir,
-				    cs_array->data[i], FALSE, opt_raw)) {
-					ni_error("Unable to read config source %s",
+	for (c = optind; c < argc; ++c) {
+		if (strchr(argv[c], ':'))
+			continue;
+		if (ni_string_eq(argv[c], "all")) {
+			ni_string_array_destroy(&ifnames);
+			break;
+		}
+		if (ni_string_array_index(&ifnames, argv[c]))
+			ni_string_array_append(&ifnames, argv[c]);
+	}
+	/*TODO is it correct ?*/
+	if (root_schema) {
+		ni_string_array_destroy(&opt_ifconfig);
+		ni_string_array_append(&opt_ifconfig, root_schema);
+	}
+
+	const ni_string_array_t *cs_array = ni_config_sources("ifconfig");
+	ni_assert(cs_array);
+
+	for (i = 0; i < cs_array->count; i++) {
+		if (!opt_ifconfig.count ||
+			ni_string_array_index(&opt_ifconfig, cs_array->data[i]) >= 0) {
+			if (!ni_ifconfig_read(&docs, opt_global_rootdir,
+						cs_array->data[i], FALSE, opt_raw)) {
+				ni_error("Unable to read config source %s",
 						cs_array->data[i]);
-					return 1;
-				}
+				return 1;
 			}
 		}
 	}
+/* TODO why we need ni_string_printf(&path, "%s%s", root_schema, argv[optind++]); */
+#if 0
 	else {
 		while(optind < argc) {
 			char *path = NULL;
@@ -761,64 +792,65 @@ do_show_config(int argc, char **argv, const char *root_schema)
 				ni_string_free(&path);
 		}
 	}
+#endif
 
-	if (opt_output == NULL) {
-		for (i = 0; i < docs.count; i++)
-			xml_node_print(docs.data[i]->root, stdout);
+	if (opt_output && !ni_isdir(opt_output)) {
+		if ((fp = fopen(opt_output, "w")) == NULL)
+			ni_fatal("unable to open %s for writing: %m", opt_output);
 	}
-	else if (ni_isdir(opt_output)) {
-		for (i = 0; i < docs.count; i++) {
-			xml_document_t *result = docs.data[i];
-			unsigned int seq = 0;
-			xml_node_t *ifnode;
 
-			/* Write resulting XML document as a bunch of files, one per interface */
-			for (ifnode = result->root->children; ifnode; ifnode = ifnode->next) {
-				char pathbuf[4096];
-				xml_node_t *namenode;
-				const char *ifname;
-				FILE *fp;
+	for (i = 0; i < docs.count; i++) {
+		xml_document_t *result = docs.data[i];
+		unsigned int seq = 0;
+		xml_node_t *ifnode;
 
-				namenode = xml_node_get_child(ifnode, "name");
-				if (!namenode) {
+		/* Write resulting XML document as a bunch of files, one per interface */
+		for (ifnode = result->root->children; ifnode; ifnode = ifnode->next) {
+			char pathbuf[4096];
+			xml_node_t *namenode;
+			const char *ifname;
+
+			namenode = xml_node_get_child(ifnode, "name");
+			if (!namenode) {
+				/* FIXME: add config source location */
+				ni_error("Config file %s does not contain <name> node", "");
+				break;
+			}
+
+			if ((ifname = namenode->cdata) != NULL) {
+				snprintf(pathbuf, sizeof(pathbuf), "%s/%s.xml", opt_output, ifname);
+				if (ifnames.count && ni_string_array_index(&ifnames, ifname) < 0)
+					continue;
+			} else {
+				/* TODO handle namespace and ifnames */
+				const char *ns;
+
+				if (!(ns = xml_node_get_attr(namenode, "namespace"))) {
 					/* FIXME: add config source location */
-					ni_error("Config file %s does not contain <name> node", "");
+					ni_error("Interface node in config file %s has"
+							"invalid <name> element", "");
 					break;
 				}
+				snprintf(pathbuf, sizeof(pathbuf), "%s/id-%s-%u.xml",
+						opt_output, ns, seq++);
+			}
 
-				if ((ifname = namenode->cdata) != NULL) {
-					snprintf(pathbuf, sizeof(pathbuf), "%s/%s.xml", opt_output, ifname);
-				} else {
-					const char *ns;
-
-					if (!(ns = xml_node_get_attr(namenode, "namespace"))) {
-						/* FIXME: add config source location */
-						ni_error("Interface node in config file %s has"
-							"invalid <name> element", "");
-						break;
-					}
-					snprintf(pathbuf, sizeof(pathbuf), "%s/id-%s-%u.xml",
-							opt_output, ns, seq++);
-				}
-
+			if (opt_output && ni_isdir(opt_output))
 				if ((fp = fopen(pathbuf, "w")) == NULL)
 					ni_fatal("unable to open %s for writing: %m", pathbuf);
 
+			if (!opt_output)
+				xml_node_print(ifnode, stdout);
+			else
 				xml_node_print(ifnode, fp);
+
+			if (opt_output && ni_isdir(opt_output))
 				fclose(fp);
-			}
 		}
 	}
-	else {
-		FILE *fp;
 
-		if ((fp = fopen(opt_output, "w")) == NULL)
-			ni_fatal("unable to open %s for writing: %m", opt_output);
-
-		for (i = 0; i < docs.count; i++)
-			xml_node_print(docs.data[i]->root, fp);
+	if (opt_output && !ni_isdir(opt_output) && fp)
 		fclose(fp);
-	}
 
 	xml_document_array_destroy(&docs);
 	return 0;
