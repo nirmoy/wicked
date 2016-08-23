@@ -1299,6 +1299,10 @@ __ni_dhcp6_build_oro_opts(ni_dhcp6_device_t *dev,
 				ni_dhcp6_option_request_t *oro,
 				const ni_addrconf_lease_t *lease)
 {
+
+	const ni_dhcp6_config_t *options = dev->config;
+	unsigned int i, code;
+
 	/*
 	 * TODO: use config->update or something else
 	 */
@@ -1324,6 +1328,10 @@ __ni_dhcp6_build_oro_opts(ni_dhcp6_device_t *dev,
 	ni_dhcp6_option_request_append(oro, NI_DHCP6_OPTION_SIP_SERVER_A);
 	ni_dhcp6_option_request_append(oro, NI_DHCP6_OPTION_FQDN);
 
+	for (i = 0; i < options->request_options.count; ++i) {
+		code = options->request_options.data[i];
+		ni_dhcp6_option_request_append(oro, code);
+	}
 	return oro->count > 0 ? 0 : -1;
 }
 

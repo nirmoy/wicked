@@ -4745,6 +4745,33 @@ __ni_suse_addrconf_dhcp4_options(const ni_sysconfig_t *sc, ni_compat_netdev_t *c
 	return ret;
 }
 
+static void
+__ni_suse_parse_dhcp6_req_options(const ni_sysconfig_t *sc, ni_compat_netdev_t *compat, const char *prefix)
+{
+	ni_string_array_t vars = NI_STRING_ARRAY_INIT;
+	ni_string_array_t opts = NI_STRING_ARRAY_INIT;
+	const char *value;
+	unsigned int i, j;
+	unsigned int code;
+
+	ni_sysconfig_find_matching(sc, prefix, &vars);
+	for (i = 0; i < vars.count; ++i) {
+		value = ni_sysconfig_get_value(sc, vars.data[i]);
+		ni_string_split(&opts, value, " ", 0);
+		for (j = 0; j < opts.count; ++j) {
+			const char *opt = opts.data[j];
+
+			/* numeric option codes only for now */
+			if (ni_parse_uint(opt, &code, 10) || !code || code >= 255)
+				continue;
+			ni_string_array_append(&compat->dhcp6.request_options, opt);
+		}
+		ni_string_array_destroy(&opts);
+	}
+	ni_string_array_destroy(&vars);
+}
+
+
 /*
  * Process DHCPv6 addrconf
  */
@@ -4827,6 +4854,8 @@ __ni_suse_addrconf_dhcp6_options(const ni_sysconfig_t *sc, ni_compat_netdev_t *c
 					NI_ADDRCONF_UPDATE_HOSTNAME, FALSE);
 		}
 	}
+
+	__ni_suse_parse_dhcp6_req_options(sc, compat, "DHCLIENT6_REQUEST_OPTION");
 
 	return ret;
 }

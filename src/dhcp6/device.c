@@ -243,6 +243,7 @@ __ni_dhcp6_device_config_free(ni_dhcp6_config_t *config)
 		ni_string_array_destroy(&config->user_class);
 		ni_string_array_destroy(&config->vendor_class.data);
 		ni_var_array_destroy(&config->vendor_opts.data);
+		ni_uint_array_destroy(&config->request_options);
 		free(config);
 	}
 }
@@ -910,6 +911,7 @@ ni_dhcp6_acquire(ni_dhcp6_device_t *dev, const ni_dhcp6_request_t *req, char **e
 	const char *mode;
 	size_t len;
 	int rv;
+	unsigned int i, n;
 
 	if (!dev || !req || !err) {
 		return -NI_ERROR_INVALID_ARGS;
@@ -1033,6 +1035,18 @@ ni_dhcp6_acquire(ni_dhcp6_device_t *dev, const ni_dhcp6_request_t *req, char **e
 			__ni_dhcp6_device_config_free(config);
 			ni_string_dup(err, "Cannot read network device settings");
 			return -NI_ERROR_GENERAL_FAILURE;
+		}
+	}
+	for (n = i = 0; i < req->request_options.count; ++i) {
+		const char *option = req->request_options.data[i];
+		unsigned int code;
+
+		if (ni_parse_uint(option, &code, 10) || !code || code >= 255)
+			continue;
+
+		if (!ni_uint_array_contains(&config->request_options, code)) {
+			ni_debug_dhcp("  request-option[%u]: %u", n++, code);
+			ni_uint_array_append(&config->request_options, code);
 		}
 	}
 
@@ -1462,6 +1476,7 @@ ni_dhcp6_request_free(ni_dhcp6_request_t *req)
 		ni_string_free(&req->hostname);
 		ni_string_free(&req->clientid);
 		ni_dhcp6_ia_list_destroy(&req->ia_list);
+		ni_string_array_destroy(&req->request_options);
 		/*
 		 * req->vendor_class
 		 * ....

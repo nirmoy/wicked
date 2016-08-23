@@ -36,6 +36,7 @@ typedef struct ni_dhcp6_request	ni_dhcp6_request_t;
 typedef struct ni_dhcp6_config	ni_dhcp6_config_t;
 typedef struct ni_dhcp6_device	ni_dhcp6_device_t;
 
+extern ni_dhcp6_device_t *ni_dhcp6_active;
 /*
  * -- supplicant actions
  */
@@ -79,6 +80,9 @@ struct ni_dhcp6_request {
 	/* Options controlling what to put into the lease request */
 	char *			hostname;
 	char *			clientid;
+
+	ni_string_array_t	request_options;
+
 #if 0
 	char *			user_class;
 	char *			vendor_class;
@@ -151,6 +155,8 @@ struct ni_dhcp6_config {
 	}			vendor_opts;
 
 	unsigned int		update;
+
+	ni_uint_array_t		request_options;
 
 	ni_dhcp6_ia_t *		ia_list;	/* IA_{NA,TA,PD}'s to request   */
 };
