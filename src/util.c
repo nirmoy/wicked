@@ -2865,6 +2865,64 @@ failed:
 	return NULL;
 }
 
+/* extract hostname from DHCLIENT_HOSTNAME_OPTION
+	which can have
+	FQDN[:foo.example.com]
+	HOST[:foo.example.com]
+	FQDN:foo.example.com
+	HOST:foo.example.com
+*/
+int
+ni_extract_config_hostname(const char * string, char **out)
+{
+	const char * tmp = string;
+	const char * sp;
+	int len = 0, err = 1;
+	int str_len = strlen(string);
+
+	if (!strncmp(string, "HOST", 4) || !strncmp(string, "FQDN", 4)) {
+		tmp = string + 4;
+		str_len = str_len - 4;
+	}
+	else
+		return -1;
+
+	if (tmp[0] == ':') {
+		tmp++;
+		str_len--;
+		len = strlen(tmp);
+		*out = strdup(tmp);
+		return len;
+	} else
+		if (tmp[0] == '[') {
+			if (tmp[1] == ':') {
+				tmp = tmp + 2;
+				str_len = str_len - 2;
+				sp = tmp;
+				while(tmp && str_len>0) {
+					if (tmp[0] == ']') {
+						err = 0;
+						break;
+					}
+					len++;
+					tmp++;
+					str_len--;
+				}
+				if (err || !len) {
+					printf("Error\n");
+					return -1;
+				}
+
+				*out = strndup(sp, len);
+				return len;
+			}
+			else
+				return -1;
+
+		}
+
+	return -1;
+}
 /**
  * Check for valid a domain name
  *

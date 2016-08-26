@@ -145,6 +145,7 @@ struct ni_dhcp4_request {
 	unsigned int		lease_time;	/* to request specific lease time	*/
 	ni_bool_t		recover_lease;	/* recover and reuse existing lease	*/
 	ni_bool_t		release_lease;	/* release lease on drop request	*/
+	ni_bool_t		fqdn;			/* set fqdn hostname if present */
 
 	/* Options controlling what to put into the lease request */
 	char *			clientid;

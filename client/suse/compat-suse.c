@@ -4665,11 +4665,32 @@ __ni_suse_addrconf_dhcp4_options(const ni_sysconfig_t *sc, ni_compat_netdev_t *c
 	ni_bool_t ret = TRUE;
 
 	if ((string = ni_sysconfig_get_value(sc, "DHCLIENT_HOSTNAME_OPTION")) != NULL) {
+		char *hostname;
+
 		if (!strcasecmp(string, "AUTO")) {
 			ni_string_dup(&compat->dhcp4.hostname, __ni_suse_default_hostname);
-		} else
-		if (ni_check_domain_name(string, ni_string_len(string), 0)) {
-			ni_string_dup(&compat->dhcp4.hostname, string);
+			compat->dhcp4.fqdn = 0;
+		} else  
+		if (!strncmp(string, "HOST", 4) || !strncmp(string, "FQDN", 4)) {
+
+			if (ni_extract_config_hostname(string, &hostname) == -1) {
+				ni_warn("%s: Cannot parse DHCLIENT_HOSTNAME_OPTION='%s'",
+					ni_basename(sc->pathname), string);
+				ret = FALSE;
+			} else {
+				if (ni_check_domain_name(hostname, ni_string_len(hostname), 0)) {
+					compat->dhcp4.hostname = hostname;
+					if (!strncmp(string, "FQDN", 4))
+						compat->dhcp4.fqdn = 1;
+				} else {
+					ni_warn("%s: Cannot parse DHCLIENT_HOSTNAME_OPTION='%s'",
+						ni_basename(sc->pathname), string);
+					ret = FALSE;
+				}
+			}
+		} else 
+			if (ni_check_domain_name(string, ni_string_len(string), 0)) {
+				ni_string_dup(&compat->dhcp4.hostname, string);
 		} else {
 			ni_warn("%s: Cannot parse DHCLIENT_HOSTNAME_OPTION='%s'",
 				ni_basename(sc->pathname), string);

@@ -1974,6 +1974,8 @@ __ni_compat_generate_dhcp4_addrconf(xml_node_t *ifnode, const ni_compat_netdev_t
 				ni_format_boolean(compat->dhcp4.recover_lease));
 	xml_node_dict_set(dhcp, "release-lease",
 				ni_format_boolean(compat->dhcp4.release_lease));
+	xml_node_dict_set(dhcp, "fqdn",
+				ni_format_boolean(compat->dhcp4.fqdn));
 
 	if (compat->dhcp4.client_id)
 		xml_node_dict_set(dhcp, "client-id", compat->dhcp4.client_id);

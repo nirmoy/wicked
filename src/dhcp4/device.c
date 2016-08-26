@@ -281,6 +281,7 @@ ni_dhcp4_acquire(ni_dhcp4_device_t *dev, const ni_dhcp4_request_t *info)
 	config->route_priority = info->route_priority;
 	config->recover_lease = info->recover_lease;
 	config->release_lease = info->release_lease;
+	config->fqdn = info->fqdn;
 
 	config->max_lease_time = ni_dhcp4_config_max_lease_time();
 	if (config->max_lease_time == 0)

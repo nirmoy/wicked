@@ -73,6 +73,7 @@ typedef struct ni_compat_netdev {
 		unsigned int	lease_time;
 		ni_bool_t	recover_lease;
 		ni_bool_t	release_lease;
+		ni_bool_t	fqdn;
 
 		unsigned int	route_priority;
 		unsigned int	update;

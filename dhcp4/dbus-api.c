@@ -402,6 +402,7 @@ static ni_dbus_property_t	dhcp4_request_properties[] = {
 	DHCP4REQ_UINT_PROPERTY(lease-time, lease_time, RO),
 	DHCP4REQ_BOOL_PROPERTY(recover-lease, recover_lease, RO),
 	DHCP4REQ_BOOL_PROPERTY(release-lease, release_lease, RO),
+    DHCP4REQ_BOOL_PROPERTY(fqdn, fqdn, RO),
 	DHCP4REQ_UINT_PROPERTY(update, update, RO),
 	DHCP4REQ_STRING_PROPERTY(hostname, hostname, RO),
 	DHCP4REQ_UINT_PROPERTY(route-priority, route_priority, RO),
