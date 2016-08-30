@@ -29,7 +29,6 @@
 static unsigned int	ni_dhcp4_do_bits(unsigned int);
 static const char *	__ni_dhcp4_print_doflags(unsigned int);
 
-static uint32_t ni_dhcp4_xid;
 ni_dhcp4_device_t *	ni_dhcp4_active;
 
 /*
@@ -611,16 +610,37 @@ ni_dhcp4_device_prepare_message(void *data)
 	return 0;
 }
 
+
+void
+ni_dhcp4_new_xid(ni_dhcp4_device_t *cur)
+{
+	ni_dhcp4_device_t *dev;
+	unsigned int xid;
+
+	if (!cur)
+		return;
+
+	do {
+		do {
+			xid = random();
+		} while (!xid);
+
+		for (dev = ni_dhcp4_active; dev; dev = dev->next) {
+			if (xid == dev->dhcp4.xid) {
+				xid = 0;
+				break;
+			}
+		}
+	} while (!xid); 
+
+	cur->dhcp4.xid = xid;
+}
+
 int
 ni_dhcp4_device_send_message(ni_dhcp4_device_t *dev, unsigned int msg_code, const ni_addrconf_lease_t *lease)
 {
 	ni_timeout_param_t timeout;
 	int rv;
-
-	/* Assign a new XID to this message */
-	if (ni_dhcp4_xid == 0)
-		ni_dhcp4_xid = random();
-	dev->dhcp4.xid = ni_dhcp4_xid++;
 
 	dev->transmit.msg_code = msg_code;
 	dev->transmit.lease = lease;
@@ -681,11 +701,6 @@ ni_dhcp4_device_send_message_unicast(ni_dhcp4_device_t *dev, unsigned int msg_co
 		.sin_addr.s_addr = lease->dhcp4.server_id.s_addr,
 		.sin_port = htons(DHCP4_SERVER_PORT),
 	};
-
-	/* Assign a new XID to this message */
-	if (ni_dhcp4_xid == 0)
-		ni_dhcp4_xid = random();
-	dev->dhcp4.xid = ni_dhcp4_xid++;
 
 	dev->transmit.msg_code = msg_code;
 	dev->transmit.lease = lease;

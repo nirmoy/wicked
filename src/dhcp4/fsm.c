@@ -220,7 +220,6 @@ ni_dhcp4_fsm_process_dhcp4_packet(ni_dhcp4_device_t *dev, ni_buffer_t *msgbuf)
 	 * waiting for additional packets.
 	 */
 	ni_dhcp4_device_disarm_retransmit(dev);
-	dev->dhcp4.xid = 0;
 
 	/* move to next stage of protocol */
 	switch (msg_code) {
@@ -356,8 +355,10 @@ __ni_dhcp4_fsm_discover(ni_dhcp4_device_t *dev, int scan_offers)
 
 	if (dev->config->elapsed_timeout)
 		ni_info("%s: Reinitiating DHCPv4 discovery (ifindex %d)", dev->ifname, dev->link.ifindex);
-	else
+	else {
 		ni_info("%s: Initiating DHCPv4 discovery (ifindex %d)", dev->ifname, dev->link.ifindex);
+		ni_dhcp4_new_xid(dev);
+	}
 
 	/* If we already have a lease, try asking for the same.
 	 * If not, create a dummy lease with NULL fields.
@@ -425,6 +426,7 @@ ni_dhcp4_fsm_renewal(ni_dhcp4_device_t *dev, ni_bool_t oneshot)
 		if (expire_time > now && deadline > expire_time)
 			deadline = expire_time;
 		ni_dhcp4_fsm_set_timeout(dev, deadline - now);
+		ni_dhcp4_new_xid(dev);
 		ni_dhcp4_device_send_message_unicast(dev, DHCP4_REQUEST, dev->lease);
 		if (!oneshot)
 			retry = TRUE;
@@ -455,6 +457,7 @@ ni_dhcp4_fsm_rebind(ni_dhcp4_device_t *dev, ni_bool_t oneshot)
 		if (expire_time - now < dev->config->capture_timeout)
 			dev->config->capture_timeout = expire_time - now;
 		ni_dhcp4_fsm_set_timeout(dev, dev->config->capture_timeout);
+		ni_dhcp4_new_xid(dev);
 		ni_dhcp4_device_send_message(dev, DHCP4_REQUEST, dev->lease);
 		if (!oneshot)
 			retry = TRUE;
@@ -466,6 +469,7 @@ static void
 ni_dhcp4_fsm_rebind_init(ni_dhcp4_device_t *dev)
 {
 	dev->fsm.state = NI_DHCP4_STATE_REBINDING;
+	ni_dhcp4_new_xid(dev);
 	dev->start_time = time(NULL);
 	dev->lease->dhcp4.server_id.s_addr = 0;
 	/* Send rebind request at least once */
@@ -489,6 +493,7 @@ ni_dhcp4_fsm_reboot(ni_dhcp4_device_t *dev)
 	if (expire_time > now && deadline > expire_time)
 		deadline = expire_time;
 	dev->config->capture_timeout = deadline - now;
+	ni_dhcp4_new_xid(dev);
 
 	ni_dhcp4_fsm_set_timeout(dev, dev->config->capture_timeout);
 	ni_dhcp4_device_send_message(dev, DHCP4_REQUEST, dev->lease);
@@ -519,6 +524,7 @@ ni_dhcp4_fsm_release(ni_dhcp4_device_t *dev)
 		return;
 	if (dev->config->release_lease) {
 		ni_debug_dhcp("%s: releasing lease", dev->ifname);
+		ni_dhcp4_new_xid(dev);
 		ni_dhcp4_device_send_message(dev, DHCP4_RELEASE, dev->lease);
 		ni_dhcp4_fsm_commit_lease(dev, NULL);
 	} else {
