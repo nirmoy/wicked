@@ -58,6 +58,13 @@ typedef struct ni_ethtool_offload {
 	ni_tristate_t	lro;
 } ni_ethtool_offload_t;
 
+typedef struct ni_ethtool_ring {
+	unsigned int		tx;
+	unsigned int		rx;
+	unsigned int		rx_jumbo;
+	unsigned int		rx_mini;
+} ni_ethtool_ring_t;
+
 struct ni_ethernet {
 	ni_hwaddr_t		permanent_address;
 	unsigned int		link_speed;
@@ -67,6 +74,7 @@ struct ni_ethernet {
 
 	ni_ethernet_wol_t	wol;
 	ni_ethtool_offload_t	offload;
+	ni_ethtool_ring_t       ring;
 
 	unsigned int		identify_time;
 };

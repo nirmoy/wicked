@@ -672,6 +672,97 @@ __ni_system_ethernet_refresh(ni_netdev_t *dev)
 	ni_netdev_set_ethernet(dev, ether);
 }
 
+static int
+ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
+{
+	struct ethtool_ringparam tmp;
+
+	tmp.cmd = ETHTOOL_GRINGPARAM;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GRINGPARAM, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+				"%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+		return -1;
+	}
+
+	ring->tx = tmp.tx_pending;
+	ring->rx = tmp.rx_pending;
+	ring->rx_jumbo = tmp.rx_jumbo_pending;
+	ring->rx_mini = tmp.rx_mini_pending;
+	return 0;
+}
+
+static int
+ni_ethtool_validate_ring_param(unsigned int curr, unsigned int wanted,
+		unsigned int max, char *rparam, const char *ifname)
+{
+	ni_warn("%s: ETHTOOL_OPTIONS %s %u -> %u\n", ifname, rparam, curr, wanted);
+	if (curr == wanted) {
+		ni_warn("%s: ETHTOOL_OPTIONS %s remain unchanged", ifname, rparam);
+		return 1;
+	}
+
+	if (curr > max) {
+		ni_warn("%s: ETHTOOL_OPTIONS %s crossed max(%u) limit",
+			ifname, rparam, max);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
+{
+	struct ethtool_ringparam tmp;
+
+	tmp.cmd = ETHTOOL_GRINGPARAM;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GRINGPARAM, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+		return -1;
+	}
+
+	if (ring->tx && ni_ethtool_validate_ring_param(tmp.tx_pending, ring->tx,
+				tmp.tx_max_pending, "tx", ifname) != 1) {
+		tmp.tx_pending = ring->tx;
+	}
+
+	if (ring->rx && ni_ethtool_validate_ring_param(tmp.rx_pending, ring->rx,
+				tmp.tx_max_pending, "rx", ifname) != 1) {
+		tmp.tx_pending = ring->tx;
+	}
+
+	if (ring->rx_jumbo && ni_ethtool_validate_ring_param(tmp.rx_jumbo_pending,
+				ring->rx_jumbo,	tmp.rx_jumbo_max_pending, "rx-jumbo", ifname) != 1) {
+		tmp.rx_jumbo_pending = ring->rx_jumbo;
+	}
+
+	if (ring->rx_mini && ni_ethtool_validate_ring_param(tmp.rx_mini_pending,
+				ring->rx_mini, tmp.rx_mini_max_pending, "rx-mini", ifname) != 1) {
+		tmp.rx_mini_pending = ring->rx_mini;
+	}
+
+	tmp.cmd = ETHTOOL_SRINGPARAM;
+	if (__ni_ethtool(ifname, ETHTOOL_SRINGPARAM, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_SRINGPARAM failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_SRINGPARAM failed: %m", ifname);
+		return -1;
+	}
+
+	return 0;
+}
+
 void
 __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 {
@@ -679,6 +770,7 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_get_offload(ifname, &ether->offload);
 	__ni_ethtool_get_permanent_address(ifname, &ether->permanent_address);
 	__ni_ethtool_get_gset(ifname, ether);
+	ni_ethtool_get_ring(ifname, &ether->ring);
 }
 
 /*
@@ -870,4 +962,5 @@ __ni_system_ethernet_set(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_set_wol(ifname, &ether->wol);
 	__ni_ethtool_set_offload(ifname, &ether->offload);
 	__ni_ethtool_set_sset(ifname, ether);
+	ni_ethtool_set_ring(ifname, &ether->ring);
 }
