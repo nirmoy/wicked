@@ -59,10 +59,11 @@ typedef struct ni_ethtool_offload {
 } ni_ethtool_offload_t;
 
 typedef struct ni_ethtool_ring {
-	unsigned int		tx;
-	unsigned int		rx;
-	unsigned int		rx_jumbo;
-	unsigned int		rx_mini;
+	ni_tristate_t	supported;
+	unsigned int	tx;
+	unsigned int	rx;
+	unsigned int	rx_jumbo;
+	unsigned int	rx_mini;
 } ni_ethtool_ring_t;
 
 struct ni_ethernet {

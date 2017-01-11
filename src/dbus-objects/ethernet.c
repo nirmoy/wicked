@@ -350,6 +350,9 @@ __ni_objectmodel_ethernet_get_ring(const ni_dbus_object_t *object,
 	if (!(eth = __ni_objectmodel_ethernet_read_handle(object, error)))
 		return FALSE;
 
+	if (eth->ring.supported == NI_TRISTATE_DISABLE)
+		return FALSE;
+
 	if (eth->ring.tx) {
 		ni_dbus_dict_add_int32(result, "tx", eth->ring.tx);
 	}

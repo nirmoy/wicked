@@ -56,6 +56,7 @@ static void	__ni_system_ethernet_get(const char *, ni_ethernet_t *);
 static void	__ni_system_ethernet_set(const char *, ni_ethernet_t *);
 static int	__ni_ethtool_get_gset(const char *, ni_ethernet_t *);
 static void	ni_ethtool_offload_init(ni_ethtool_offload_t *);
+static void	ni_ethtool_ring_init(ni_ethtool_ring_t *);
 
 /*
  * Allocate ethernet struct
@@ -71,6 +72,7 @@ ni_ethernet_new(void)
 	ni_link_address_init(&ether->wol.sopass);
 	ether->autoneg_enable		= NI_TRISTATE_DEFAULT;
 	ni_ethtool_offload_init(&ether->offload);
+	ni_ethtool_ring_init(&ether->ring);
 
 	return ether;
 }
@@ -672,10 +674,20 @@ __ni_system_ethernet_refresh(ni_netdev_t *dev)
 	ni_netdev_set_ethernet(dev, ether);
 }
 
+static void
+ni_ethtool_ring_init(ni_ethtool_ring_t *ring)
+{
+	if (ring)
+		ring->supported = NI_TRISTATE_DEFAULT;
+}
+
 static int
 ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
 {
 	struct ethtool_ringparam tmp;
+
+	if (ring->supported == NI_TRISTATE_DISABLE)
+		return -1;
 
 	tmp.cmd = ETHTOOL_GRINGPARAM;
 	memset(&tmp, 0, sizeof(tmp));
@@ -685,6 +697,8 @@ ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
 		else
 			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
 				"%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+
+		ring->supported = NI_TRISTATE_DISABLE;
 		return -1;
 	}
 
@@ -719,6 +733,9 @@ ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 {
 	struct ethtool_ringparam tmp;
 
+	if (ring->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
 	tmp.cmd = ETHTOOL_GRINGPARAM;
 	memset(&tmp, 0, sizeof(tmp));
 	if (__ni_ethtool(ifname, ETHTOOL_GRINGPARAM, &tmp) < 0) {
@@ -727,6 +744,8 @@ ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 		else
 			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
 					"%s: ETHTOOL_GRINGPARAM failed: %m", ifname);
+
+		ring->supported = NI_TRISTATE_DISABLE;
 		return -1;
 	}
 
@@ -737,7 +756,7 @@ ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 
 	if (ring->rx && ni_ethtool_validate_ring_param(tmp.rx_pending, ring->rx,
 				tmp.tx_max_pending, "rx", ifname) != 1) {
-		tmp.tx_pending = ring->tx;
+		tmp.rx_pending = ring->tx;
 	}
 
 	if (ring->rx_jumbo && ni_ethtool_validate_ring_param(tmp.rx_jumbo_pending,
