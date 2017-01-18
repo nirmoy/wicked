@@ -57,6 +57,7 @@ static void	__ni_system_ethernet_set(const char *, ni_ethernet_t *);
 static int	__ni_ethtool_get_gset(const char *, ni_ethernet_t *);
 static void	ni_ethtool_offload_init(ni_ethtool_offload_t *);
 static void	ni_ethtool_ring_init(ni_ethtool_ring_t *);
+static void ni_ethtool_ring_coalesce_init(ni_ethtool_coalesce_t *coalesce);
 
 /*
  * Allocate ethernet struct
@@ -73,6 +74,7 @@ ni_ethernet_new(void)
 	ether->autoneg_enable		= NI_TRISTATE_DEFAULT;
 	ni_ethtool_offload_init(&ether->offload);
 	ni_ethtool_ring_init(&ether->ring);
+	ni_ethtool_ring_coalesce_init(&ether->coalesce);
 
 	return ether;
 }
@@ -674,6 +676,227 @@ __ni_system_ethernet_refresh(ni_netdev_t *dev)
 	ni_netdev_set_ethernet(dev, ether);
 }
 
+ni_bool_t
+ni_ethtool_validate_ring_param(unsigned int *curr, unsigned int wanted,
+		unsigned int max, char *rparam, const char *ifname)
+{
+	if (wanted == NI_ETHTOOL_RING_DEFAULT)
+		return FALSE;
+
+	if (!curr || *curr == wanted)
+		return FALSE;
+
+	if (wanted > max) {
+		ni_warn("%s: ETHTOOL_OPTIONS %s crossed max(%u) limit",
+				ifname, rparam, max);
+		return FALSE;
+	}
+
+	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+			"%s: ETHTOOL_OPTIONS changed %s from %u to  %u\n",
+			ifname, rparam, *curr, wanted);
+	*curr = wanted;
+	return TRUE;
+}
+
+static void
+ni_ethtool_ring_coalesce_init(ni_ethtool_coalesce_t *coalesce)
+{
+	if (coalesce) {
+		coalesce->supported = NI_TRISTATE_DEFAULT;
+		coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
+		coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
+		coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+}
+
+static int
+ni_ethtool_get_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
+{
+	struct ethtool_coalesce tmp;
+
+	if (coalesce->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	tmp.cmd = ETHTOOL_GCOALESCE;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GCOALESCE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GCOALESCE failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+				"%s: ETHTOOL_GCOALESCE failed: %m", ifname);
+
+		coalesce->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	coalesce->rx_usecs = tmp.rx_coalesce_usecs;
+	coalesce->rx_frames = tmp.rx_max_coalesced_frames;
+	coalesce->rx_usecs_irq = tmp.rx_coalesce_usecs_irq;
+	coalesce->rx_frames_irq = tmp.rx_max_coalesced_frames_irq;
+	coalesce->tx_usecs = tmp.tx_coalesce_usecs;
+	coalesce->tx_frames = tmp.tx_max_coalesced_frames;
+	coalesce->tx_usecs_irq = tmp.tx_coalesce_usecs_irq;
+	coalesce->tx_frames_irq = tmp.tx_max_coalesced_frames_irq;
+	coalesce->stats_block_usecs = tmp.stats_block_coalesce_usecs;
+	coalesce->pkt_rate_low = tmp.pkt_rate_low;
+	coalesce->rx_usecs_low = tmp.rx_coalesce_usecs_low;
+	coalesce->rx_frames_low = tmp.rx_max_coalesced_frames_low;
+	coalesce->tx_usecs_low = tmp.tx_coalesce_usecs_low;
+	coalesce->tx_frames_low = tmp.tx_max_coalesced_frames_low;
+	coalesce->pkt_rate_high = tmp.pkt_rate_high;
+	coalesce->rx_usecs_high = tmp.rx_coalesce_usecs_high;
+	coalesce->rx_frames_high = tmp.rx_max_coalesced_frames_high;
+	coalesce->tx_usecs_high = tmp.tx_coalesce_usecs_high;
+	coalesce->tx_frames_high = tmp.tx_max_coalesced_frames_high;
+	coalesce->sample_interval = tmp.rate_sample_interval;
+	return 0;
+}
+
+static int
+ni_ethtool_set_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
+{
+	struct ethtool_coalesce tmp;
+	ni_bool_t changed = FALSE;
+
+	if (coalesce->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	tmp.cmd = ETHTOOL_GCOALESCE;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GCOALESCE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GCOALESCE failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+				"%s: ETHTOOL_GCOALESCE failed: %m", ifname);
+
+		coalesce->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.rx_coalesce_usecs, coalesce->rx_usecs,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_usecs", ifname)) {
+		changed = TRUE;
+	}
+	/*
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_frames,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_frames", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_usecs_irq,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_usecs_irq", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_frames_irq,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_frames_irq", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_usecs,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_usecs", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_frames,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_frames", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_usecs_irq,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_usecs_irq", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_frames_irq,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_frames_irq", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->stats_block_usecs,
+				NI_ETHTOOL_COALESCE_DEFAULT, "stats_block_usecs", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->pkt_rate_low,
+				NI_ETHTOOL_COALESCE_DEFAULT, "pkt_rate_low", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_usecs_low,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_usecs_low", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_frames_low,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_frames_low", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_usecs_low,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_usecs_low", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_frames_low,
+				tmp.tx_max_pending, "tx_frames_low", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->pkt_rate_high,
+				tmp.tx_max_pending, "pkt_rate_high", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_usecs_high,
+				, "rx_usecs_high", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_frames_high,
+				NI_ETHTOOL_COALESCE_DEFAULT, "rx_frames_high", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_usecs_high,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_usecs_high", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->tx_frames_high,
+				NI_ETHTOOL_COALESCE_DEFAULT, "tx_frames_high", ifname)) {
+		changed = TRUE;
+	}
+	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->sample_interval,
+				NI_ETHTOOL_COALESCE_DEFAULT, "sample_interval", ifname)) {
+		changed = TRUE;
+	}*/
+	if (!changed) {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: no ring parameter changed", ifname);
+		return 0;
+	}
+
+	if (__ni_ethtool(ifname, ETHTOOL_SCOALESCE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_SCOALESCE failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_SCOALESCE failed: %m", ifname);
+		return -1;
+	}
+	else {
+		ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: applied coalesce parameters", ifname);
+	}
+
+	return 0;
+}
+
 static void
 ni_ethtool_ring_init(ni_ethtool_ring_t *ring)
 {
@@ -712,29 +935,6 @@ ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
 	ring->rx_jumbo = tmp.rx_jumbo_pending;
 	ring->rx_mini = tmp.rx_mini_pending;
 	return 0;
-}
-
-ni_bool_t
-ni_ethtool_validate_ring_param(unsigned int *curr, unsigned int wanted,
-		unsigned int max, char *rparam, const char *ifname)
-{
-	if (wanted == NI_ETHTOOL_RING_DEFAULT)
-		return FALSE;
-
-	if (!curr || *curr == wanted)
-		return FALSE;
-
-	if (wanted > max) {
-		ni_warn("%s: ETHTOOL_OPTIONS %s crossed max(%u) limit",
-				ifname, rparam, max);
-		return FALSE;
-	}
-
-	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
-			"%s: ETHTOOL_OPTIONS changed %s from %u to  %u\n",
-			ifname, rparam, *curr, wanted);
-	*curr = wanted;
-	return TRUE;
 }
 
 static int
@@ -809,6 +1009,7 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_get_permanent_address(ifname, &ether->permanent_address);
 	__ni_ethtool_get_gset(ifname, ether);
 	ni_ethtool_get_ring(ifname, &ether->ring);
+	ni_ethtool_get_coalesce(ifname, &ether->coalesce);
 }
 
 /*
@@ -1001,4 +1202,5 @@ __ni_system_ethernet_set(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_set_offload(ifname, &ether->offload);
 	__ni_ethtool_set_sset(ifname, ether);
 	ni_ethtool_set_ring(ifname, &ether->ring);
+	ni_ethtool_set_coalesce(ifname, &ether->coalesce);
 }
