@@ -794,10 +794,14 @@ ni_ethtool_set_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
 		coalesce->supported = NI_TRISTATE_DISABLE;
 		return -1;
 	}
+	ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: ETHTOOL before %u", ifname, tmp.rx_coalesce_usecs);
 	if (ni_ethtool_validate_ring_param(&tmp.rx_coalesce_usecs, coalesce->rx_usecs,
 				NI_ETHTOOL_COALESCE_DEFAULT, "rx_usecs", ifname)) {
 		changed = TRUE;
 	}
+	ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: ETHTOOL after %u", ifname, tmp.rx_coalesce_usecs);
 	/*
 	if (ni_ethtool_validate_ring_param(&tmp.tx_pending, coalesce->rx_frames,
 				NI_ETHTOOL_COALESCE_DEFAULT, "rx_frames", ifname)) {
