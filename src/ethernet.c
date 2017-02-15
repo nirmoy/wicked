@@ -970,7 +970,6 @@ static int
 ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 {
 	struct ethtool_ringparam tmp;
-	ni_bool_t changed = FALSE;
 
 	if (ring->supported == NI_TRISTATE_DISABLE)
 		return -1;
@@ -988,44 +987,18 @@ ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 		return -1;
 	}
 
-	if (ni_ethtool_validate_uint_param(&tmp.tx_pending, ring->tx,
-				tmp.tx_max_pending, "ring", "tx", ifname)) {
-		changed = TRUE;
-	}
-
-	if (ni_ethtool_validate_uint_param(&tmp.rx_pending, ring->rx,
-				tmp.tx_max_pending, "ring", "rx", ifname)) {
-		changed = TRUE;
-	}
-
-	if (ni_ethtool_validate_uint_param(&tmp.rx_jumbo_pending,
-				ring->rx_jumbo,	tmp.rx_jumbo_max_pending, "ring", "rx-jumbo", ifname)) {
-		changed = TRUE;
-	}
-
-	if (ni_ethtool_validate_uint_param(&tmp.rx_mini_pending,
-				ring->rx_mini, tmp.rx_mini_max_pending, "ring", "rx-mini", ifname)) {
-		changed = TRUE;
-	}
-
-	if (!changed) {
-		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
-				"%s: no ethtool ring parameter changed", ifname);
-		return 0;
-	}
-
-	if (__ni_ethtool(ifname, ETHTOOL_SRINGPARAM, &tmp) < 0) {
-		if (errno != EOPNOTSUPP && errno != ENODEV)
-			ni_warn("%s: ETHTOOL_SRINGPARAM failed: %m", ifname);
-		else
-			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
-					"%s: ETHTOOL_SRINGPARAM failed: %m", ifname);
-		return -1;
-	}
-	else {
-		ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
-				"%s: applied ring parameters", ifname);
-	}
+	if (ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"tx", tmp.tx_max_pending, &tmp.tx_pending, ring->tx) < 0)
+		ring->supported = NI_TRISTATE_DISABLE;
+	if (ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"rx", tmp.rx_max_pending, &tmp.rx_pending, ring->rx) < 0)
+		ring->supported = NI_TRISTATE_DISABLE;
+	if (ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"rx-jumbo", tmp.rx_jumbo_max_pending, &tmp.rx_jumbo_pending, ring->rx_jumbo) < 0)
+		ring->supported = NI_TRISTATE_DISABLE;
+	if (ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"rx-mini", tmp.rx_mini_max_pending, &tmp.rx_mini_pending, ring->rx_mini) < 0)
+		ring->supported = NI_TRISTATE_DISABLE;
 
 	return 0;
 }
