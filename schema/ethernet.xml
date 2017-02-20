@@ -50,6 +50,51 @@
       <gro type="tristate"/>
       <lro type="tristate"/>
     </offload>
+
+    <eee class="dict">
+      <enabled type="tristate"/>
+      <active  type="tristate"/>			<!-- read-only system property -->
+
+      <supported type="uint32" constraint="bitmask"/>	<!-- read-only system property -->
+      <advertise type="uint32" constraint="bitmask"/>
+      <lp-advertised type="uint32" constraint="bitmask"/><!-- read-only system property -->
+
+      <tx-lpi type="tristate"/>
+      <tx-timer type="uint32"/>
+    </eee>
+
+    <ring class="dict">
+      <tx type="uint32"/>
+      <rx type="uint32"/>
+      <rx-jumbo type="uint32"/>
+      <rx-mini type="uint32"/>
+    </ring>
+
+    <coalesce class="dict">
+      <adaptive-rx type="tristate"/>
+      <adaptive-tx type="tristate"/>
+      <rx-usecs type="uint32"/>
+      <rx-frames type="uint32"/>
+      <rx-usecs-irq type="uint32"/>
+      <rx-frames-irq type="uint32"/>
+      <tx-usecs type="uint32"/>
+      <tx-frames type="uint32"/>
+      <tx-usecs-irq type="uint32"/>
+      <tx-frames-irq type="uint32"/>
+      <sample-interval type="uint32"/>
+      <stats-block-usecs type="uint32"/>
+      <pkt-rate-low type="uint32"/>
+      <rx-usecs-low type="uint32"/>
+      <rx-frames-low type="uint32"/>
+      <tx-usecs-low type="uint32"/>
+      <tx-frames-low type="uint32"/>
+      <pkt-rate-high type="uint32"/>
+      <rx-usecs-high type="uint32"/>
+      <rx-frames-high type="uint32"/>
+      <tx-usecs-high type="uint32"/>
+      <tx-frames-high type="uint32"/>
+    </coalesce>
+
   </define>
 
   <define name="properties" class="dict" extends="ethernet:configuration">

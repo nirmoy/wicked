@@ -56,6 +56,9 @@ static void	__ni_system_ethernet_get(const char *, ni_ethernet_t *);
 static void	__ni_system_ethernet_set(const char *, ni_ethernet_t *);
 static int	__ni_ethtool_get_gset(const char *, ni_ethernet_t *);
 static void	ni_ethtool_offload_init(ni_ethtool_offload_t *);
+static void	ni_ethtool_eee_init(ni_ethtool_eee_t *);
+static void	ni_ethtool_ring_init(ni_ethtool_ring_t *);
+static void	ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce);
 
 /*
  * Allocate ethernet struct
@@ -71,6 +74,9 @@ ni_ethernet_new(void)
 	ni_link_address_init(&ether->wol.sopass);
 	ether->autoneg_enable		= NI_TRISTATE_DEFAULT;
 	ni_ethtool_offload_init(&ether->offload);
+	ni_ethtool_eee_init(&ether->eee);
+	ni_ethtool_ring_init(&ether->ring);
+	ni_ethtool_coalesce_init(&ether->coalesce);
 
 	return ether;
 }
@@ -672,6 +678,418 @@ __ni_system_ethernet_refresh(ni_netdev_t *dev)
 	ni_netdev_set_ethernet(dev, ether);
 }
 
+ni_bool_t
+ni_ethtool_validate_uint_param(unsigned int *curr, unsigned int wanted,
+		unsigned int max, const char *type, const char *rparam, const char *ifname)
+{
+	if (wanted == NI_ETHTOOL_RING_DEFAULT)
+		return FALSE;
+
+	if (!curr || *curr == wanted)
+		return FALSE;
+
+	if (wanted > max) {
+		ni_warn("%s: ethtool.%s.%s option crossed max(%u) limit",
+				ifname, type, rparam, max);
+		return FALSE;
+	}
+
+	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+			"%s: ethtool.%s.%s option changed from %u to %u\n",
+			ifname, type, rparam, *curr, wanted);
+	*curr = wanted;
+	return TRUE;
+}
+
+static void
+ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce)
+{
+	if (coalesce) {
+		coalesce->supported = NI_TRISTATE_DEFAULT;
+
+		coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
+		coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
+
+		coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+}
+
+static int
+ni_ethtool_get_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
+{
+	struct ethtool_coalesce tmp;
+
+	if (coalesce->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GCOALESCE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.coalesce options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.coalesce options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			coalesce->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	ni_tristate_set(&coalesce->adaptive_tx, tmp.use_adaptive_tx_coalesce);
+	ni_tristate_set(&coalesce->adaptive_rx, tmp.use_adaptive_rx_coalesce);
+
+	coalesce->pkt_rate_low		= tmp.pkt_rate_low;
+	coalesce->pkt_rate_high		= tmp.pkt_rate_high;
+
+	coalesce->sample_interval	= tmp.rate_sample_interval;
+	coalesce->stats_block_usecs	= tmp.stats_block_coalesce_usecs;
+
+	coalesce->rx_usecs		= tmp.rx_coalesce_usecs;
+	coalesce->rx_usecs_irq		= tmp.rx_coalesce_usecs_irq;
+	coalesce->rx_usecs_low		= tmp.rx_coalesce_usecs_low;
+	coalesce->rx_usecs_high		= tmp.rx_coalesce_usecs_high;
+
+	coalesce->rx_frames		= tmp.rx_max_coalesced_frames;
+	coalesce->rx_frames_irq		= tmp.rx_max_coalesced_frames_irq;
+	coalesce->rx_frames_low		= tmp.rx_max_coalesced_frames_low;
+	coalesce->rx_frames_high	= tmp.rx_max_coalesced_frames_high;
+
+	coalesce->tx_usecs		= tmp.tx_coalesce_usecs;
+	coalesce->tx_usecs_irq		= tmp.tx_coalesce_usecs_irq;
+	coalesce->tx_usecs_low		= tmp.tx_coalesce_usecs_low;
+	coalesce->tx_usecs_high		= tmp.tx_coalesce_usecs_high;
+
+	coalesce->tx_frames		= tmp.tx_max_coalesced_frames;
+	coalesce->tx_frames_irq		= tmp.tx_max_coalesced_frames_irq;
+	coalesce->tx_frames_low		= tmp.tx_max_coalesced_frames_low;
+	coalesce->tx_frames_high	= tmp.tx_max_coalesced_frames_high;
+
+	return 0;
+}
+
+static ni_bool_t
+ni_ethtool_set_uint_single_param(const char *ifname, void *eopt,
+				int eopt_code, const char *eopt_name,
+				const char *name, unsigned int value)
+{
+	if (__ni_ethtool(ifname, eopt_code, eopt) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: failed to set ethtool.%s.%s to %u: %m",
+					ifname, eopt_name, name, value);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+					"%s: failed to set ethtool.%s.%s to %u: %m",
+					ifname, eopt_name, name, value);
+		return FALSE;
+	}
+	else {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: applied ethtool.%s.%s = %u", ifname, eopt_name, name, value);
+	}
+
+	return TRUE;
+}
+
+static int
+ni_ethtool_set_uint_param(const char *ifname, void *eopt,
+				int eopt_code, const char *eopt_name,
+				const char *name,   unsigned int max,
+				unsigned int *curr, unsigned int want)
+{
+	unsigned int save = *curr;
+
+	if (!ni_ethtool_validate_uint_param(curr, want, max, eopt_name, name, ifname))
+		return 1;
+
+	if (ni_ethtool_set_uint_single_param(ifname, eopt, eopt_code, eopt_name, name, want))
+		return 0;
+
+	*curr = save;
+	return 1;
+}
+
+static int
+ni_ethtool_set_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
+{
+	struct ethtool_coalesce tmp;
+
+	if (coalesce->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GCOALESCE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.coalesce options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.coalesce options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			coalesce->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "adaptive_tx", NI_TRISTATE_ENABLE,
+			&tmp.use_adaptive_tx_coalesce, coalesce->adaptive_tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "adaptive_rx", NI_TRISTATE_ENABLE,
+			&tmp.use_adaptive_rx_coalesce, coalesce->adaptive_rx);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "pkt_rate_low", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.pkt_rate_low, coalesce->pkt_rate_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "pkt_rate_high", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.pkt_rate_high, coalesce->pkt_rate_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "sample_interval", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.rate_sample_interval, coalesce->sample_interval);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "stats_block_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.stats_block_coalesce_usecs, coalesce->stats_block_usecs);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs, coalesce->rx_usecs);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_irq, coalesce->rx_usecs_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_low, coalesce->rx_usecs_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_high, coalesce->rx_usecs_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.use_adaptive_rx_coalesce, coalesce->rx_frames);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_irq, coalesce->rx_frames_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_low, coalesce->rx_frames_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_high, coalesce->rx_frames_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs, coalesce->tx_usecs);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_irq, coalesce->tx_usecs_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_low, coalesce->tx_usecs_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_high, coalesce->tx_usecs_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.use_adaptive_tx_coalesce, coalesce->tx_frames);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_max_coalesced_frames_irq, coalesce->tx_frames_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_max_coalesced_frames_low, coalesce->tx_frames_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_high", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.tx_max_coalesced_frames_high, coalesce->tx_frames_high);
+
+	return 0;
+}
+
+static void
+ni_ethtool_eee_init(ni_ethtool_eee_t *eee)
+{
+	if (eee) {
+		eee->supported = NI_TRISTATE_DEFAULT;
+
+		eee->status.enabled = NI_TRISTATE_DEFAULT;
+		eee->status.active = NI_TRISTATE_DEFAULT;
+
+		eee->speed.supported = NI_ETHTOOL_EEE_DEFAULT;
+		eee->speed.advertised = NI_ETHTOOL_EEE_DEFAULT;
+		eee->speed.lp_advertised = NI_ETHTOOL_EEE_DEFAULT;
+
+		eee->tx_lpi.enabled = NI_TRISTATE_DEFAULT;
+		eee->tx_lpi.timer = NI_ETHTOOL_EEE_DEFAULT;
+	}
+}
+
+static int
+ni_ethtool_get_eee(const char *ifname, ni_ethtool_eee_t *eee)
+{
+	struct ethtool_eee tmp;
+
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GEEE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.eee options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.eee options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			eee->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	eee->status.enabled = tmp.eee_enabled;
+	eee->status.active = tmp.eee_active;
+
+	eee->speed.supported = tmp.supported;
+	eee->speed.advertised = tmp.advertised;
+	eee->speed.lp_advertised = tmp.lp_advertised;
+
+	eee->tx_lpi.enabled = tmp.tx_lpi_enabled;
+	eee->tx_lpi.timer = tmp.tx_lpi_timer;
+
+	return 0;
+}
+
+static int
+ni_ethtool_set_eee(const char *ifname, ni_ethtool_eee_t *eee)
+{
+	struct ethtool_eee tmp;
+
+	if (!eee || eee->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GEEE, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.eee options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.eee options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			eee->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "enable",
+			NI_TRISTATE_ENABLE, &tmp.eee_enabled, eee->status.enabled);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "advertise",
+			NI_ETHTOOL_EEE_DEFAULT, &tmp.advertised, eee->speed.advertised);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "tx-lpi",
+			NI_TRISTATE_ENABLE, &tmp.tx_lpi_enabled, eee->tx_lpi.enabled);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "tx-timer",
+			NI_ETHTOOL_EEE_DEFAULT, &tmp.tx_lpi_timer, eee->tx_lpi.timer);
+
+	return 0;
+}
+
+static void
+ni_ethtool_ring_init(ni_ethtool_ring_t *ring)
+{
+	if (ring) {
+		ring->supported = NI_TRISTATE_DEFAULT;
+		ring->tx	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx_mini	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx_jumbo	= NI_ETHTOOL_RING_DEFAULT;
+	}
+}
+
+static int
+ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
+{
+	struct ethtool_ringparam tmp;
+
+	if (ring->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	tmp.cmd = ETHTOOL_GRINGPARAM;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GRINGPARAM, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.ring options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.ring options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			ring->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	ring->tx = tmp.tx_pending;
+	ring->rx = tmp.rx_pending;
+	ring->rx_jumbo = tmp.rx_jumbo_pending;
+	ring->rx_mini = tmp.rx_mini_pending;
+	return 0;
+}
+
+static int
+ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
+{
+	struct ethtool_ringparam tmp;
+
+	if (ring->supported == NI_TRISTATE_DISABLE)
+		return -1;
+
+	tmp.cmd = ETHTOOL_GRINGPARAM;
+	memset(&tmp, 0, sizeof(tmp));
+	if (__ni_ethtool(ifname, ETHTOOL_GRINGPARAM, &tmp) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: getting ethtool.ring options failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: getting ethtool.ring options failed: %m", ifname);
+
+		if (errno != EOPNOTSUPP)
+			ring->supported = NI_TRISTATE_DISABLE;
+		return -1;
+	}
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"tx", tmp.tx_max_pending, &tmp.tx_pending, ring->tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"rx", tmp.rx_max_pending, &tmp.rx_pending, ring->rx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"rx-jumbo", tmp.rx_jumbo_max_pending,
+			&tmp.rx_jumbo_pending, ring->rx_jumbo);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"rx-mini", tmp.rx_mini_max_pending,
+				&tmp.rx_mini_pending, ring->rx_mini);
+
+	return 0;
+}
+
 void
 __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 {
@@ -679,6 +1097,9 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_get_offload(ifname, &ether->offload);
 	__ni_ethtool_get_permanent_address(ifname, &ether->permanent_address);
 	__ni_ethtool_get_gset(ifname, ether);
+	ni_ethtool_get_eee(ifname, &ether->eee);
+	ni_ethtool_get_ring(ifname, &ether->ring);
+	ni_ethtool_get_coalesce(ifname, &ether->coalesce);
 }
 
 /*
@@ -870,4 +1291,7 @@ __ni_system_ethernet_set(const char *ifname, ni_ethernet_t *ether)
 	__ni_ethtool_set_wol(ifname, &ether->wol);
 	__ni_ethtool_set_offload(ifname, &ether->offload);
 	__ni_ethtool_set_sset(ifname, ether);
+	ni_ethtool_set_eee(ifname, &ether->eee);
+	ni_ethtool_set_ring(ifname, &ether->ring);
+	ni_ethtool_set_coalesce(ifname, &ether->coalesce);
 }

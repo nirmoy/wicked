@@ -58,6 +58,71 @@ typedef struct ni_ethtool_offload {
 	ni_tristate_t	lro;
 } ni_ethtool_offload_t;
 
+#define NI_ETHTOOL_EEE_DEFAULT		-1U
+
+typedef struct ni_ethtool_eee {
+	ni_tristate_t	supported;
+
+	struct {
+		ni_tristate_t	enabled;
+		ni_tristate_t	active;
+	} status;
+	struct {
+		unsigned int	supported;
+		unsigned int	advertised;
+		unsigned int	lp_advertised;
+	} speed;
+	struct {
+		ni_tristate_t	enabled;
+		unsigned int	timer;
+	} tx_lpi;
+} ni_ethtool_eee_t;
+
+#define NI_ETHTOOL_RING_DEFAULT		-1U
+
+typedef struct ni_ethtool_ring {
+	ni_tristate_t	supported;
+	unsigned int	tx;
+	unsigned int	rx;
+	unsigned int	rx_jumbo;
+	unsigned int	rx_mini;
+} ni_ethtool_ring_t;
+
+#define NI_ETHTOOL_COALESCE_DEFAULT		-1U
+
+typedef struct ni_ethtool_coalesce {
+	ni_tristate_t	supported;
+
+	ni_tristate_t   adaptive_tx;
+	ni_tristate_t   adaptive_rx;
+
+	unsigned int	pkt_rate_low;
+	unsigned int	pkt_rate_high;
+
+	unsigned int	sample_interval;
+	unsigned int	stats_block_usecs;
+
+	unsigned int	rx_usecs;
+	unsigned int	rx_usecs_irq;
+	unsigned int	rx_usecs_low;
+	unsigned int	rx_usecs_high;
+
+	unsigned int	rx_frames;
+	unsigned int	rx_frames_irq;
+	unsigned int	rx_frames_low;
+	unsigned int	rx_frames_high;
+
+	unsigned int	tx_usecs;
+	unsigned int	tx_usecs_irq;
+	unsigned int	tx_usecs_low;
+	unsigned int	tx_usecs_high;
+
+	unsigned int	tx_frames;
+	unsigned int	tx_frames_irq;
+	unsigned int	tx_frames_low;
+	unsigned int	tx_frames_high;
+} ni_ethtool_coalesce_t;
+
 struct ni_ethernet {
 	ni_hwaddr_t		permanent_address;
 	unsigned int		link_speed;
@@ -67,6 +132,9 @@ struct ni_ethernet {
 
 	ni_ethernet_wol_t	wol;
 	ni_ethtool_offload_t	offload;
+	ni_ethtool_eee_t	eee;
+	ni_ethtool_ring_t       ring;
+	ni_ethtool_coalesce_t   coalesce;
 
 	unsigned int		identify_time;
 };
