@@ -57,6 +57,7 @@
 #include "ifstatus.h"
 #include "arputil.h"
 #include "tester.h"
+#include "duid.h"
 
 enum {
 	OPT_HELP,
@@ -181,6 +182,7 @@ main(int argc, char **argv)
 				"  xpath       [options] expr ...\n"
 				"  test        [subcommand]\n"
 				"  arp         [options] <ifname> <IP>\n"
+				"  duid        [subcommand]\n"
 				"\n", program);
 			goto done;
 
@@ -319,6 +321,9 @@ main(int argc, char **argv)
 	} else
 	if (!strcmp(cmd, "arp")) {
 		status = ni_do_arp(argc - optind, argv + optind);
+	} else
+	if (!strcmp(cmd, "duid")) {
+		status = ni_do_duid(argc - optind, argv + optind);
 	} else {
 		fprintf(stderr, "Unsupported command %s\n", cmd);
 		goto usage;

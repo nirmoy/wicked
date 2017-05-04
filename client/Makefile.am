@@ -62,7 +62,8 @@ wicked_SOURCES			= \
 	main.c			\
 	nanny.c			\
 	reachable.c		\
-	tester.c
+	tester.c        \
+	duid.c
 
 noinst_HEADERS			= \
 	arputil.h		\
@@ -73,7 +74,8 @@ noinst_HEADERS			= \
 	ifstatus.h		\
 	reachable.h		\
 	tester.h		\
-	wicked-client.h
+	wicked-client.h \
+	duid.h
 
 install-data-local:
 	$(MKDIR_P) "$(DESTDIR)$(wicked_configdir)/ifconfig"
