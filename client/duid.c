@@ -81,15 +81,15 @@ ni_do_duid_create(int argc, char **argv)
 	optind += all ? (c-2) : 1; //todo verify
 	duid_type = argv[optind];
 	
-	if (!strncmp(duid_type, "duid-llt", 3)) {
+	if (ni_string_startswith(duid_type, "duid-llt")) {
 	} else
-	if (!strncmp(duid_type, "duid-ll", 3)) {
+	if (ni_string_startswith(duid_type, "duid-ll")) {
 	} else
-	if (!strncmp(duid_type, "duid-en", 3)) {
+	if (ni_string_startswith(duid_type, "duid-en")) {
 	} else
-	if (!strncmp(duid_type, "duid-uuid", 3)) {
+	if (ni_string_startswith(duid_type, "duid-uuid")) {
 	} else {
-		fprintf(stderr, "Unsupported command %s\n", opt_cmd);
+		fprintf(stderr, "Unsupported duid type %s\n", duid_type);
 	}
 	
 
@@ -112,7 +112,7 @@ ni_do_duid(int argc, char **argv)
 
 	opt_cmd = argv[optind];
 
-	if (!strncmp(opt_cmd, "create", 5)) {
+	if (ni_string_startswith(opt_cmd, "create")) {
 		return ni_do_duid_create(argc, argv);
 	}
 	for (c = optind; c < argc; ++c) {
@@ -135,7 +135,7 @@ ni_do_duid(int argc, char **argv)
 			".",
 			CONFIG_DEFAULT_DUID_FILE);
 
-	if (!strncmp(opt_cmd, "get", 3)) {
+	if (ni_string_startswith(opt_cmd, "get")) {
      	duid_doc = xml_document_read(path);
 		if (duid_doc) {
 			for (ifnode = duid_doc->root->children; ifnode; ifnode = ifnode->next) {
