@@ -27,6 +27,7 @@
 #include "appconfig.h"
 #include "xml-schema.h"
 #include "dhcp.h"
+#include "duid.h"
 
 static const char *__ni_ifconfig_source_types[] = {
 	"firmware:",
@@ -792,6 +793,58 @@ ni_config_parse_dhcp6_definitions(struct ni_config_dhcp6 *dhcp6, xml_node_t *nod
 }
 
 static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_en(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	return TRUE;
+}
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_ll(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	return TRUE;
+}
+
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_llt(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	return TRUE;
+}
+
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_uuid(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	return TRUE;
+}
+
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	xml_node_t *child;
+
+	if (!ni_string_empty(node->cdata))
+		return ni_string_dup(&dhcp6->default_duid, node->cdata);
+
+	for (child = node->children; child; child = child->next) {
+		if (ni_string_eq(child->name, "en")) {
+			if (!ni_config_parse_addrconf_dhcp6_duid_en(dhcp6, child))
+				return FALSE;
+		} else
+		if (ni_string_eq(child->name, "ll")) {
+			if (!ni_config_parse_addrconf_dhcp6_duid_ll(dhcp6, child))
+				return FALSE;
+		} else
+		if (ni_string_eq(child->name, "llt")) {
+			if (!ni_config_parse_addrconf_dhcp6_duid_llt(dhcp6, child))
+				return FALSE;
+		} else
+		if (ni_string_eq(child->name, "uuid")) {
+			if (!ni_config_parse_addrconf_dhcp6_duid_uuid(dhcp6, child))
+				return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+static ni_bool_t
 ni_config_parse_addrconf_dhcp6_nodes(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
 	xml_node_t *child;
@@ -802,8 +855,9 @@ ni_config_parse_addrconf_dhcp6_nodes(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 	for (child = node->children; child; child = child->next) {
 		const char *attrval;
 
-		if (!strcmp(child->name, "default-duid") && !ni_string_empty(child->cdata)) {
-			ni_string_dup(&dhcp6->default_duid, child->cdata);
+		if (!strcmp(child->name, "default-duid")) {
+			if (!ni_config_parse_addrconf_dhcp6_duid(dhcp6, child))
+				ni_warn("config: unable to parsere <default-duid>");
 		} else
 		if (!strcmp(child->name, "user-class")) {
 			ni_string_array_destroy(&dhcp6->user_class_data);
