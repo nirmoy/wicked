@@ -826,17 +826,65 @@ ni_config_parse_addrconf_dhcp6_duid_en(ni_config_dhcp6_t *dhcp6, xml_node_t *nod
 }
 
 static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_ll_node(ni_config_dhcp6_t *dhcp6, xml_node_t *node, unsigned int type)
+{
+	unsigned int hwtype;
+	ni_hwaddr_t hwaddr;
+	ni_opaque_t duid;
+	xml_node_t *child;
+
+	if (!(child = xml_node_get_child(node, "hardware")))
+		return FALSE;
+
+	if ((hwtype = (unsigned int)ni_arphrd_name_to_type(child->cdata)) == -1U)
+		return FALSE;
+
+	if (hwtype > ARPHRD_VOID || !ni_link_address_length(hwtype))
+		return FALSE;
+
+	if (!(child = xml_node_get_child(node, "address")))
+		return FALSE;
+
+	if (ni_link_address_parse(&hwaddr, hwtype, child->cdata))
+		return FALSE;
+
+	if (ni_link_address_is_invalid(&hwaddr)) /* all zero and brd */
+		return FALSE;
+
+	switch (type) {
+	case NI_DUID_TYPE_LL:
+		if (!ni_duid_init_ll(&duid, hwaddr.type, hwaddr.data, hwaddr.len))
+			return FALSE;
+		break;
+	case NI_DUID_TYPE_LLT:
+		if (!ni_duid_init_llt(&duid, hwaddr.type, hwaddr.data, hwaddr.len))
+			return FALSE;
+		break;
+	default:
+		return FALSE;
+	}
+
+	return ni_duid_format_hex(&dhcp6->default_duid, &duid) != NULL;
+}
+
+static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_ll(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
-	dhcp6->generate_duid = NI_DUID_TYPE_LL;
-	return TRUE;
+	if (!node->children) {
+		dhcp6->generate_duid = NI_DUID_TYPE_LL;
+		return TRUE;
+	}
+	return ni_config_parse_addrconf_dhcp6_duid_ll_node(dhcp6, node, NI_DUID_TYPE_LL);
 }
 
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_llt(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
-	dhcp6->generate_duid = NI_DUID_TYPE_LLT;
-	return TRUE;
+	if (!node->children) {
+		dhcp6->generate_duid = NI_DUID_TYPE_LLT;
+		return TRUE;
+	}
+	return ni_config_parse_addrconf_dhcp6_duid_ll_node(dhcp6, node, NI_DUID_TYPE_LLT);
 }
 
 static ni_bool_t
