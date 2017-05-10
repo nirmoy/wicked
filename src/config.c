@@ -71,7 +71,6 @@ ni_config_new()
 	conf->addrconf.default_allow_update = ni_config_addrconf_update_mask_all();
 	conf->addrconf.dhcp4.allow_update   = ni_config_addrconf_update_mask_dhcp4();
 	conf->addrconf.dhcp6.allow_update   = ni_config_addrconf_update_mask_dhcp6();
-	conf->addrconf.dhcp6.generate_duid  = NI_DUID_TYPE_LLT;
 	conf->addrconf.auto4.allow_update   = ni_config_addrconf_update_mask_auto4();
 	conf->addrconf.auto6.allow_update   = ni_config_addrconf_update_mask_auto6();
 
