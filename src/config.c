@@ -71,6 +71,7 @@ ni_config_new()
 	conf->addrconf.default_allow_update = ni_config_addrconf_update_mask_all();
 	conf->addrconf.dhcp4.allow_update   = ni_config_addrconf_update_mask_dhcp4();
 	conf->addrconf.dhcp6.allow_update   = ni_config_addrconf_update_mask_dhcp6();
+	conf->addrconf.dhcp6.generate_duid  = NI_DUID_TYPE_LLT;
 	conf->addrconf.auto4.allow_update   = ni_config_addrconf_update_mask_auto4();
 	conf->addrconf.auto6.allow_update   = ni_config_addrconf_update_mask_auto6();
 
@@ -170,6 +171,8 @@ ni_config_dhcp6_clone(const ni_config_dhcp6_t *src, const char *device)
 	dst->lease_time = src->lease_time;
 	dst->allow_update = src->allow_update;
 	ni_string_dup(&dst->default_duid, src->default_duid);
+	dst->generate_duid = src->generate_duid;
+	dst->device_duid = src->device_duid;
 
 	ni_string_array_copy(&dst->user_class_data, &src->user_class_data);
 	dst->vendor_class_en = src->vendor_class_en;
@@ -795,53 +798,185 @@ ni_config_parse_dhcp6_definitions(struct ni_config_dhcp6 *dhcp6, xml_node_t *nod
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_en(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
-	return TRUE;
+	unsigned int enumber;
+	xml_node_t *child;
+	ni_opaque_t duid;
+	ni_opaque_t enid;
+
+	if (!(child = xml_node_get_child(node, "enterprise-number")))
+		return FALSE;
+
+	if (ni_parse_uint(child->cdata, &enumber, 0) < 0 || !enumber)
+		return FALSE;
+
+	if (!(child = xml_node_get_child(node, "identifier")))
+		return FALSE;
+
+	if (ni_string_empty(child->cdata))
+		return FALSE;
+
+	enid.len = ni_parse_hex_data(child->cdata, enid.data, sizeof(duid.data), ":");
+	if ((ssize_t)enid.len <= 0 || enid.len > NI_DUID_DATA_LEN - sizeof(uint32_t))
+		return FALSE;
+
+	if (!ni_duid_init_en(&duid, enumber, enid.data, enid.len))
+		return FALSE;
+
+	return ni_duid_format_hex(&dhcp6->default_duid, &duid) != NULL;
 }
+
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_ll(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
+	dhcp6->generate_duid = NI_DUID_TYPE_LL;
 	return TRUE;
 }
 
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_llt(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
+	dhcp6->generate_duid = NI_DUID_TYPE_LLT;
 	return TRUE;
+}
+
+static ni_bool_t
+ni_config_parse_machine_id_uuid(ni_uuid_t *uuid, const char *filename)
+{
+	char line[64] = {'\0'};
+	ssize_t len;
+	FILE *file;
+
+	if (ni_string_empty(filename))
+		filename = "/etc/machine-id";
+
+	if (!uuid || !(file = fopen(filename, "re")))
+		return FALSE;
+
+	if (!fgets(line, sizeof(line), file)) {
+		fclose(file);
+		return FALSE;
+	}
+
+	line[strcspn(line, "\n")] = '\0';
+	fclose(file);
+
+	len = ni_parse_hex_data(line, uuid->octets, sizeof(uuid->octets), "");
+	return len == sizeof(uuid->octets);
+}
+
+static ni_bool_t
+ni_config_parse_dmi_product_uuid(ni_uuid_t *uuid, const char *filename)
+{
+	char line[64] = {'\0'};
+	FILE *file;
+
+	if (ni_string_empty(filename))
+		filename = "/sys/devices/virtual/dmi/id/product_uuid";
+
+	if (!uuid || !(file = fopen(filename, "re")))
+		return FALSE;
+
+	if (!fgets(line, sizeof(line), file)) {
+		fclose(file);
+		return FALSE;
+	}
+
+	line[strcspn(line, "\n")] = '\0';
+	fclose(file);
+
+	return ni_uuid_parse(uuid, line) == 0;
+}
+
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_uuid_node(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
+{
+	ni_opaque_t duid;
+	ni_uuid_t uuid;
+
+	if (ni_string_eq(node->name, "machine-id")) {
+		if (!ni_config_parse_machine_id_uuid(&uuid, node->cdata))
+			return FALSE;
+	} else
+	if (ni_string_eq(node->name, "dmi:id:product-uuid")) {
+		if (!ni_config_parse_dmi_product_uuid(&uuid, node->cdata))
+			return FALSE;
+	} else
+		return FALSE;
+
+	if (!ni_duid_init_uuid(&duid, &uuid))
+		return FALSE;
+
+	return ni_duid_format_hex(&dhcp6->default_duid, &duid) != NULL;
+}
+
+static ni_bool_t
+ni_config_parse_addrconf_dhcp6_duid_uuid_string(ni_config_dhcp6_t *dhcp6, const char *string)
+{
+	ni_opaque_t duid;
+	ni_uuid_t uuid;
+
+	if (ni_uuid_parse(&uuid, string) < 0)
+		return FALSE;
+
+	if (!ni_duid_init_uuid(&duid, &uuid))
+		return FALSE;
+
+	return ni_duid_format_hex(&dhcp6->default_duid, &duid) != NULL;
 }
 
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_uuid(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
-	return TRUE;
+	xml_node_t *child;
+
+	if (!ni_string_empty(node->cdata))
+		return ni_config_parse_addrconf_dhcp6_duid_uuid_string(dhcp6, node->cdata);
+
+	for (child = node->children; child; child = child->next) {
+		/* return on 1st success */
+		if (ni_config_parse_addrconf_dhcp6_duid_uuid_node(dhcp6, child))
+			return TRUE;
+	}
+	return FALSE;
 }
 
 static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
 	xml_node_t *child;
+	const char *scope;
 
 	if (!ni_string_empty(node->cdata))
 		return ni_string_dup(&dhcp6->default_duid, node->cdata);
 
+	if ((scope = xml_node_get_attr(node, "scope"))) {
+		/* DUID is a machine id, interface have an own IAID,
+		 * but as workaround for corner cases, we permit to
+		 * generate the duid per device.
+		 */
+		dhcp6->device_duid = ni_string_eq("device", scope);
+	}
+
 	for (child = node->children; child; child = child->next) {
+		/* return on 1st success */
 		if (ni_string_eq(child->name, "en")) {
-			if (!ni_config_parse_addrconf_dhcp6_duid_en(dhcp6, child))
-				return FALSE;
+			if (ni_config_parse_addrconf_dhcp6_duid_en(dhcp6, child))
+				return TRUE;
 		} else
 		if (ni_string_eq(child->name, "ll")) {
-			if (!ni_config_parse_addrconf_dhcp6_duid_ll(dhcp6, child))
-				return FALSE;
+			if (ni_config_parse_addrconf_dhcp6_duid_ll(dhcp6, child))
+				return TRUE;
 		} else
 		if (ni_string_eq(child->name, "llt")) {
-			if (!ni_config_parse_addrconf_dhcp6_duid_llt(dhcp6, child))
-				return FALSE;
+			if (ni_config_parse_addrconf_dhcp6_duid_llt(dhcp6, child))
+				return TRUE;
 		} else
 		if (ni_string_eq(child->name, "uuid")) {
-			if (!ni_config_parse_addrconf_dhcp6_duid_uuid(dhcp6, child))
-				return FALSE;
+			if (ni_config_parse_addrconf_dhcp6_duid_uuid(dhcp6, child))
+				return TRUE;
 		}
 	}
-	return TRUE;
+	return FALSE;
 }
 
 static ni_bool_t
