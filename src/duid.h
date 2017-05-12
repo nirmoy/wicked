@@ -72,11 +72,12 @@ typedef struct ni_duid_llt {
  * DUID type 2, Vendor-assigned unique ID based on Enterprise Number
  *
  * http://tools.ietf.org/html/rfc3315#section-9.3
+ * https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
  */
 typedef struct ni_duid_en {
 	uint16_t		type;		/* type 2                     */
-	uint32_t		enterprise;	/* vendor enterprise-number   */
-	char			identifier[];	/* vendor unique identifier   */
+	uint32_t		enterprise;	/* assigned enterprise-number */
+	unsigned char		identifier[];	/* machine unique identifier  */
 } ni_duid_en_t;
 
 /*
@@ -105,8 +106,8 @@ typedef struct ni_duid_uuid {
 extern const char *		ni_duid_type_to_name(unsigned int type);
 extern ni_bool_t		ni_duid_type_by_name(const char *name, unsigned int *type);
 
-extern ni_bool_t		ni_duid_init_llt(ni_opaque_t *duid, unsigned short arp_type, const void *hwaddr, size_t len);
-extern ni_bool_t		ni_duid_init_ll (ni_opaque_t *duid, unsigned short arp_type, const void *hwaddr, size_t len);
+extern ni_bool_t		ni_duid_init_llt(ni_opaque_t *duid, unsigned short hwtype, const void *hwaddr, size_t len);
+extern ni_bool_t		ni_duid_init_ll (ni_opaque_t *duid, unsigned short hwtype, const void *hwaddr, size_t len);
 extern ni_bool_t		ni_duid_init_en (ni_opaque_t *duid, unsigned int enumber, const void *identifier, size_t len);
 extern ni_bool_t		ni_duid_init_uuid(ni_opaque_t *duid, const ni_uuid_t *uuid);
 
@@ -118,10 +119,17 @@ extern const char *		ni_duid_format_hex(char **hex, const ni_opaque_t *duid);
 
 static inline const char *	ni_duid_print_hex(const ni_opaque_t *duid)
 {
-	return ni_print_hex(duid->data, duid->len);
+	return duid ? ni_print_hex(duid->data, duid->len) : NULL;
 }
 
 extern int			ni_duid_load(ni_opaque_t *, const char *, const char *);
 extern int			ni_duid_save(const ni_opaque_t *, const char *, const char *);
+
+extern ni_bool_t		ni_duid_create_en (ni_opaque_t *duid, const char *enumber, const char *identifier);
+extern ni_bool_t		ni_duid_create_ll (ni_opaque_t *duid, const char *hwtype, const char *hwaddr);
+extern ni_bool_t		ni_duid_create_llt(ni_opaque_t *duid, const char *hwtype, const char *hwaddr);
+extern ni_bool_t		ni_duid_create_uuid_string(ni_opaque_t *duid, const char *string);
+extern ni_bool_t		ni_duid_create_uuid_machine_id(ni_opaque_t *duid, const char *filename);
+extern ni_bool_t		ni_duid_create_uuid_dmi_product(ni_opaque_t *duid, const char *filename);
 
 #endif /* __WICKED_DUID_H__ */
