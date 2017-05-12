@@ -211,10 +211,11 @@ ni_config_dhcp6_list_find(ni_config_dhcp6_t *list, const char *device)
 	}
 	return NULL;
 }
+
 const ni_config_dhcp6_t *
 ni_config_dhcp6_find_device(const char *device)
 {
-	ni_config_dhcp6_t *dhcp;
+	const ni_config_dhcp6_t *dhcp;
 	ni_config_t *conf;
 
 	if (!(conf = ni_global.config))
@@ -224,6 +225,28 @@ ni_config_dhcp6_find_device(const char *device)
 		return dhcp;
 
 	return &conf->addrconf.dhcp6;
+}
+
+const char *
+ni_config_dhcp6_default_duid(const char *device)
+{
+	const ni_config_dhcp6_t *dhcp6 = ni_config_dhcp6_find_device(device);
+
+	return dhcp6 ? dhcp6->default_duid : NULL;
+}
+
+unsigned short
+ni_config_dhcp6_generate_duid(const char *device, ni_bool_t *device_duid)
+{
+	const ni_config_dhcp6_t *dhcp6 = ni_config_dhcp6_find_device(device);
+
+	if (dhcp6) {
+		if (device_duid)
+			*device_duid = dhcp6->device_duid;
+		return dhcp6->generate_duid;
+	}
+
+	return 0; /* any */
 }
 
 void

@@ -189,6 +189,8 @@ extern ni_bool_t	ni_config_use_nanny(void);
 
 extern const ni_config_dhcp4_t *	ni_config_dhcp4_find_device(const char *);
 extern const ni_config_dhcp6_t *	ni_config_dhcp6_find_device(const char *);
+extern const char *	ni_config_dhcp6_default_duid(const char *);
+extern unsigned short	ni_config_dhcp6_generate_duid(const char *, ni_bool_t *);
 
 extern ni_config_bonding_ctl_t	ni_config_bonding_ctl(void);
 
