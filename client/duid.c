@@ -36,6 +36,7 @@
 #include <signal.h>
 #include <mcheck.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <net/if_arp.h>
 
 #include <wicked/netinfo.h>
@@ -50,8 +51,7 @@
 
 #include "duid.h"
 
-//#define CONFIG_DEFAULT_DUID_FILE	"duid.xml"
-#define CONFIG_DEFAULT_DUID_FILE	"./test_duid.xml"
+#define CONFIG_DEFAULT_DUID_FILE	"duid.xml"
 
 void
 usage(void)
@@ -65,7 +65,7 @@ usage(void)
 			"	Set duid for a given interface\n"
 			"create <ifname ...>|all> <duid-ll|duid-llt|duid-uuid> <args>\n"
 			"	Create a duid of given type and given interface\n");
-	exit(1); //TODO
+	exit(1);
 }
 
 xml_node_t *
@@ -76,8 +76,7 @@ ni_fetch_duid_node_by_attr(const char *attr)
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s/%s", 
-			//ni_config_storedir(),
-			".",
+			ni_config_storedir(),
 			CONFIG_DEFAULT_DUID_FILE);
     duid_doc = xml_document_read(path);
 	if (duid_doc) {
@@ -91,32 +90,50 @@ ni_fetch_duid_node_by_attr(const char *attr)
 	return NULL;
 }
 
-int
-ni_create_duid_node(char *ifname, char* duid)
+static int
+ni_create_duid_node(char *ifname, const char* duid)
 {
 	xml_document_t *duid_doc;
 	xml_node_t *ifnode;
 	char path[PATH_MAX];
+	ni_bool_t node_exist = FALSE;
 
 	snprintf(path, sizeof(path), "%s/%s", 
-			//ni_config_storedir(),
-			".",
+			ni_config_storedir(),
 			CONFIG_DEFAULT_DUID_FILE);
+	if (!ni_file_exists(path)) { /* if !path create the file TODO permissions ? */
+		creat(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	}
+
     duid_doc = xml_document_read(path);
-	if (duid_doc) {
-		for (ifnode = duid_doc->root->children; ifnode; ifnode = ifnode->next) {
+	if (duid_doc) { /* empty file */
+		if (!duid_doc->root->children) {
+			xml_node_t* node =
+				xml_node_new_element("uuid", duid_doc->root, duid);
+			xml_node_add_attr(node, "device", ifname);
+		} else {
+			for (ifnode = duid_doc->root->children; ifnode; ifnode = ifnode->next) {
 				const char *devicenode = xml_node_get_attr(ifnode, "device");
 				if ((!devicenode && ni_string_eq(ifname, "default")) ||
 						ni_string_eq(ifname, devicenode)) {
 					xml_node_set_cdata(ifnode, duid);
-
-				}
+					node_exist = TRUE;
+				} 
+			}
+			if (!node_exist) {
+				xml_node_t* node = 
+					xml_node_new_element("uuid", duid_doc->root, duid);
+				xml_node_add_attr(node, "device", ifname);
+			}
 		}
 		xml_document_write(duid_doc, path);
 		xml_document_free(duid_doc);
+		return 0;
 	} else {
 		ni_error("Failed to read %s", path);
+		return 1;
 	}
+	return 1; //Should never reach here
 }
 
 static int
@@ -127,8 +144,7 @@ ni_do_duid_get(ni_string_array_t *ifnames)
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s/%s", 
-			//ni_config_storedir(),
-			".",
+			ni_config_storedir(),
 			CONFIG_DEFAULT_DUID_FILE);
 
 
@@ -144,7 +160,9 @@ ni_do_duid_get(ni_string_array_t *ifnames)
 				xml_node_print(ifnode, stdout);
 			}
 			xml_document_free(duid_doc);
+			return 0;
 		}
+		return 1;
 }
 
 static int
@@ -155,10 +173,8 @@ ni_do_duid_set(ni_string_array_t *ifnames, char *duid)
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s/%s", 
-			//ni_config_storedir(),
-			".",
+			ni_config_storedir(),
 			CONFIG_DEFAULT_DUID_FILE);
-
 
      	duid_doc = xml_document_read(path);
 		if (duid_doc) {
@@ -172,7 +188,10 @@ ni_do_duid_set(ni_string_array_t *ifnames, char *duid)
 				ni_create_duid_node(devicenode ? devicenode:"default", duid);
 			}
 			xml_document_free(duid_doc);
+			return 0;
 		}
+
+		return 1;
 }
 
 static int
@@ -200,7 +219,7 @@ ni_do_duid_create_duid_ll(ni_netdev_t *dev, char *ifname)
 		ni_create_duid_node(ifname, ni_print_hex(duid.data, duid.len));
 		return 0;
 	}
-	return -1;
+	return 1;
 }
 
 int
@@ -216,7 +235,7 @@ ni_do_duid_create_duid_en(ni_netdev_t *dev, char *ifname,
     	return FALSE;
 #endif
 	ni_duid_init_en(&duid, enumber, enid.data, enid.len);
-	ni_create_duid_node(ifname, ni_print_hex(duid.data, duid.len));
+	return ni_create_duid_node(ifname, ni_print_hex(duid.data, duid.len));
 }
 
 int
@@ -227,33 +246,31 @@ ni_do_duid_create_duid_uuid(ni_netdev_t *dev, char *ifname, char *str_uuid)
 	
 	ni_parse_hex_data(str_uuid, uuid.octets, sizeof(uuid.octets), "");
 	ni_duid_init_uuid(&duid, &uuid);
-	ni_create_duid_node(ifname, ni_print_hex(duid.data, duid.len));
+	return ni_create_duid_node(ifname, ni_print_hex(duid.data, duid.len));
 }
 
 int 
 ni_do_duid_create(int argc, char **argv)
 {
 	int status = 0;
-	int optind = 1, c;
+	int optind = 2, c;
+	char *duid_type;
+	char *ifname[IFNAMSIZ] = {0};
 	ni_string_array_t ifnames = NI_STRING_ARRAY_INIT;
-	ni_bool_t         all = FALSE;
-	char *duid_type, *opt_cmd;
-	ni_opaque_t duid;
-	
-	opt_cmd = argv[optind]; optind++;
-	
+	ni_bool_t all = FALSE;
+	ni_netdev_t *dev = NULL, *tmp_dev = NULL;
+	ni_init(argv[0]);
+	ni_netconfig_t *nc = ni_global_state_handle(1);
+
 	for (c = optind; c < argc; ++c) {
 		char *ifname = argv[c];
-
 		if (ni_string_eq(ifname, "all")) {
 			ni_string_array_destroy(&ifnames);
 			all = TRUE;
 			break;
 		}
-
 		if (ni_string_startswith(ifname, "duid"))
 			break;
-
 		if (ni_string_array_index(&ifnames, ifname) == -1)
 			ni_string_array_append(&ifnames, ifname);
 	}
@@ -261,11 +278,14 @@ ni_do_duid_create(int argc, char **argv)
 	optind += !all ? (c - 2) : 1; //todo verify
 	if (optind >= argc)
 		usage();
-	duid_type = argv[optind]; optind++;
 	
-	char *ifname[IFNAMSIZ] = {0};
-	ni_netdev_t *dev = NULL, *tmp_dev = NULL;
-	ni_netconfig_t *nc = ni_global_state_handle(1);
+	duid_type = argv[optind]; optind++;
+	if (all) {
+		for(tmp_dev = ni_netconfig_devlist(nc); tmp_dev; tmp_dev = tmp_dev->next) {
+			if (ni_string_array_index(&ifnames, ifname) == -1)
+				ni_string_array_append(&ifnames, tmp_dev->name);
+		}
+	}
 
 	for (c = 0; c < ifnames.count; c++) {
 		ni_string_array_get(&ifnames, c, ifname);
@@ -292,6 +312,7 @@ ni_do_duid_create(int argc, char **argv)
 			} else
 			if (ni_string_eq(duid_type, "duid-en")) {
 				uint32_t enumber;
+		
 				if (argc <= optind + 1)
 					usage();
 
@@ -299,9 +320,11 @@ ni_do_duid_create(int argc, char **argv)
 				ni_do_duid_create_duid_en(dev, ifname[0], enumber, argv[optind]);
 			} else
 			if (ni_string_eq(duid_type, "duid-uuid")) {
+				printf("%s\n", ifname[0]);
 
 				if(optind >= argc)
 					usage();
+
 				ni_do_duid_create_duid_uuid(dev, ifname[0], argv[optind]);
 			} else {
 				fprintf(stderr, "Unsupported duid type %s %s\n", duid_type, ni_config_storedir());
@@ -319,7 +342,6 @@ int
 ni_do_duid(int argc, char **argv)
 {
 	const char *opt_cmd;
-	xml_node_t *ifnode;
 	ni_string_array_t ifnames = NI_STRING_ARRAY_INIT;
 	int status;
 	int optind = 1, c;
