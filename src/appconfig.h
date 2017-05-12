@@ -114,8 +114,8 @@ typedef struct ni_config_dhcp6 {
 	struct ni_config_dhcp6 *next;
 	char *			device;
 
-	unsigned int		generate_duid;
 	char *			default_duid;
+	unsigned int		generate_duid;
 	ni_bool_t		device_duid;
 
 	unsigned int		allow_update;
