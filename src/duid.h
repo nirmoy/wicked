@@ -130,6 +130,6 @@ extern ni_bool_t		ni_duid_create_ll (ni_opaque_t *duid, const char *hwtype, cons
 extern ni_bool_t		ni_duid_create_llt(ni_opaque_t *duid, const char *hwtype, const char *hwaddr);
 extern ni_bool_t		ni_duid_create_uuid_string(ni_opaque_t *duid, const char *string);
 extern ni_bool_t		ni_duid_create_uuid_machine_id(ni_opaque_t *duid, const char *filename);
-extern ni_bool_t		ni_duid_create_uuid_dmi_product(ni_opaque_t *duid, const char *filename);
+extern ni_bool_t		ni_duid_create_uuid_dmi_product_id(ni_opaque_t *duid, const char *filename);
 
 #endif /* __WICKED_DUID_H__ */
