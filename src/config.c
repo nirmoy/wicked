@@ -837,6 +837,25 @@ ni_config_parse_addrconf_dhcp6_duid_en(ni_config_dhcp6_t *dhcp6, xml_node_t *nod
 }
 
 static ni_bool_t
+ni_config_parse_addrconf_dhcp6_device_duid(xml_node_t *node)
+{
+	const char *attr;
+	ni_bool_t result;
+
+	/* DUID is an ID of a host. An interface address assotiations (IA)
+	 * contains an IAID specifying the interface (unique per IA type),
+	 * but as workaround for corner cases, e.g. where the dhcp-server
+	 * is not considering IAIDs, we permit to generate per-device duid
+	 * instead of a global one.
+	 */
+	attr = xml_node_get_attr(node, "per-device");
+	if (ni_parse_boolean(attr, &result) == 0)
+		return result;
+
+	return FALSE;
+}
+
+static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid_ll(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
 	ni_opaque_t duid;
@@ -845,6 +864,7 @@ ni_config_parse_addrconf_dhcp6_duid_ll(ni_config_dhcp6_t *dhcp6, xml_node_t *nod
 
 	if (!node->children) {
 		dhcp6->generate_duid = NI_DUID_TYPE_LL;
+		dhcp6->device_duid = ni_config_parse_addrconf_dhcp6_device_duid(node);
 		return TRUE;
 	}
 
@@ -868,6 +888,7 @@ ni_config_parse_addrconf_dhcp6_duid_llt(ni_config_dhcp6_t *dhcp6, xml_node_t *no
 
 	if (!node->children) {
 		dhcp6->generate_duid = NI_DUID_TYPE_LLT;
+		dhcp6->device_duid = ni_config_parse_addrconf_dhcp6_device_duid(node);
 		return TRUE;
 	}
 
@@ -909,18 +930,9 @@ static ni_bool_t
 ni_config_parse_addrconf_dhcp6_duid(ni_config_dhcp6_t *dhcp6, xml_node_t *node)
 {
 	xml_node_t *child;
-	const char *scope;
 
 	if (!ni_string_empty(node->cdata))
 		return ni_string_dup(&dhcp6->default_duid, node->cdata);
-
-	if ((scope = xml_node_get_attr(node, "scope"))) {
-		/* DUID is a machine id, interface have an own IAID,
-		 * but as workaround for corner cases, we permit to
-		 * generate the duid per device.
-		 */
-		dhcp6->device_duid = ni_string_eq("device", scope);
-	}
 
 	for (child = node->children; child; child = child->next) {
 		/* return on 1st success */
