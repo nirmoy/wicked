@@ -38,7 +38,7 @@
 static int
 ni_do_duid_get(const char *caller, int argc, char **argv)
 {
-	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	ni_duid_map_t *map;
 	const char *ifname = NULL;
 	const char *duid = NULL;
 	int status;
@@ -66,7 +66,7 @@ ni_do_duid_get(const char *caller, int argc, char **argv)
 static int
 ni_do_duid_set(const char *caller, int argc, char **argv)
 {
-	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	ni_duid_map_t *map;
 	const char *ifname = NULL;
 	ni_opaque_t raw;
 	int status;
@@ -96,7 +96,7 @@ ni_do_duid_set(const char *caller, int argc, char **argv)
 static int
 ni_do_duid_del(const char *caller, int argc, char **argv)
 {
-	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	ni_duid_map_t *map;
 	const char *ifname = NULL;
 	int status;
 
