@@ -1,7 +1,9 @@
 /*
  *	DHCP Unique Identifier (DUID)
  *
- *	Copyright (C) 2012 Marius Tomaschewski <mt@suse.de>
+ *	DHCP Unique Identifier (DUID) utilities
+ *
+ *	Copyright (C) 2012-2017 SUSE LINUX GmbH, Nuernberg, Germany.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -13,13 +15,15 @@
  *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *	GNU General Public License for more details.
  *
- *	You should have received a copy of the GNU General Public License along
- *	with this program; if not, see <http://www.gnu.org/licenses/> or write
- *	to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- *	Boston, MA 02110-1301 USA.
+ *	You should have received a copy of the GNU General Public License
+ *	along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ *      Authors:
+ *              Marius Tomaschewski <mt@suse.de>
+ *              Nirmoy Das <ndas@suse.de>
  */
-#ifndef __WICKED_DUID_H__
-#define __WICKED_DUID_H__
+#ifndef WICKED_DUID_H
+#define WICKED_DUID_H
 
 #include <wicked/types.h>
 #include <wicked/util.h>
@@ -143,4 +147,4 @@ extern ni_bool_t		ni_duid_map_get_name(ni_duid_map_t *map, const char *duid, con
 extern ni_bool_t		ni_duid_map_set(ni_duid_map_t *map, const char *name, const char *duid);
 extern ni_bool_t		ni_duid_map_del(ni_duid_map_t *map, const char *name);
 
-#endif /* __WICKED_DUID_H__ */
+#endif /* WICKED_DUID_H */
