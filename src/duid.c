@@ -680,7 +680,7 @@ ni_duid_map_load(const char *filename)
 	if (fstat(map->fd, &stb) < 0)
 		stb.st_size = BUFSIZ;
 
-	ni_buffer_init_dynamic(&buff, stb.st_size);
+	ni_buffer_init_dynamic(&buff, stb.st_size + 1);
 	do {
 		if (!ni_buffer_tailroom(&buff))
 			ni_buffer_ensure_tailroom(&buff, BUFSIZ);
