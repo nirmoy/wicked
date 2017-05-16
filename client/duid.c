@@ -37,18 +37,23 @@
 #include "duid.h"
 
 static int
-ni_do_duid_dump(const char *caller, int argc, char **argv)
+ni_do_duid_dump(const char *command, const char *ifname, int argc, char **argv)
 {
 	ni_var_array_t vars = NI_VAR_ARRAY_INIT;
-	ni_duid_map_t *map;
+	int status = NI_WICKED_RC_USAGE;
+	ni_duid_map_t *map = NULL;
 	ni_var_t *var;
 
-	if (argc != 1)
-		return NI_WICKED_RC_USAGE;
+	if (argc != 1 || ifname) {
+		fprintf(stderr, "%s: invalid arguments\n", command);
+		goto cleanup;
+	}
 
+	status = NI_WICKED_RC_ERROR;
 	if (!(map = ni_duid_map_load(NULL)))
-		return NI_WICKED_RC_ERROR;
+		goto cleanup;
 
+	status = NI_WICKED_RC_SUCCESS;
 	if (ni_duid_map_to_vars(map, &vars)) {
 		unsigned int i;
 
@@ -58,12 +63,104 @@ ni_do_duid_dump(const char *caller, int argc, char **argv)
 		ni_var_array_destroy(&vars);
 	}
 
+cleanup:
 	ni_duid_map_free(map);
-	return NI_WICKED_RC_SUCCESS;
+	return status;
 }
 
 static int
-ni_do_duid_get(const char *caller, int argc, char **argv)
+ni_do_duid_get(const char *command, const char *ifname, int argc, char **argv)
+{
+	int status = NI_WICKED_RC_USAGE;
+	ni_duid_map_t *map = NULL;
+	const char *duid = NULL;
+
+	if (argc != 1) {
+		fprintf(stderr, "%s: invalid arguments\n", command);
+		goto cleanup;
+	}
+
+	status = NI_WICKED_RC_ERROR;
+	if (!(map = ni_duid_map_load(NULL)))
+		goto cleanup;
+
+	status = NI_WICKED_RC_NO_DEVICE;
+	if (ni_duid_map_get_duid(map, ifname, &duid)) {
+		printf("%s\t%s\n", ifname ? ifname : "default", duid);
+		status = NI_WICKED_RC_SUCCESS;
+	}
+
+cleanup:
+	ni_duid_map_free(map);
+	return status;
+}
+
+static int
+ni_do_duid_set(const char *command, const char *ifname, int argc, char **argv)
+{
+	int status = NI_WICKED_RC_USAGE;
+	ni_duid_map_t *map = NULL;
+	const char *duid = NULL;
+	ni_opaque_t raw;
+
+	if (argc != 2) {
+		fprintf(stderr, "%s: invalid arguments\n", command);
+		goto cleanup;
+	}
+
+	duid = argv[1];
+	if (ni_string_empty(duid)) {
+		fprintf(stderr, "%s: missing duid argument\n", command);
+		goto cleanup;
+	} else
+	if (!ni_duid_parse_hex(&raw, duid)) {
+		fprintf(stderr, "%s: unable to parse duid hex string\n", command);
+		status = NI_WICKED_RC_ERROR;
+		goto cleanup;
+	}
+
+	status = NI_WICKED_RC_ERROR;
+	if (!(map = ni_duid_map_load(NULL)))
+		goto cleanup;
+
+	status = NI_WICKED_RC_ERROR;
+	if (ni_duid_map_set(map, ifname, duid)) {
+		if (ni_duid_map_save(map))
+			status = NI_WICKED_RC_SUCCESS;
+	}
+
+cleanup:
+	ni_duid_map_free(map);
+	return status;
+}
+
+static int
+ni_do_duid_del(const char *command, const char *ifname, int argc, char **argv)
+{
+	int status = NI_WICKED_RC_USAGE;
+	ni_duid_map_t *map = NULL;
+
+	if (argc != 1) {
+		fprintf(stderr, "%s: invalid arguments\n", command);
+		goto cleanup;
+	}
+
+	status = NI_WICKED_RC_ERROR;
+	if (!(map = ni_duid_map_load(NULL)))
+		goto cleanup;
+
+	if (ni_duid_map_del(map, ifname)) {
+		if (ni_duid_map_save(map))
+			status = NI_WICKED_RC_SUCCESS;
+	}
+
+cleanup:
+	ni_duid_map_free(map);
+	return status;
+}
+
+int
+ni_do_duid(const char *caller, int argc, char **argv)
 {
 	enum { OPT_HELP = 'h', OPT_IFNAME = 'i' };
 	static struct option	options[] = {
@@ -72,13 +169,13 @@ ni_do_duid_get(const char *caller, int argc, char **argv)
 		{ NULL,		no_argument,		NULL,	0		}
 	};
 	int opt = 0, status = NI_WICKED_RC_USAGE;
-	ni_duid_map_t *map = NULL;
 	const char *ifname = NULL;
-	const char *duid = NULL;
 	char *program = NULL;
+	char *command = NULL;
+	const char *cmd;
 
-	if (ni_string_printf(&program, "%s %s", caller  ? caller  : "wicked duid",
-						argv[0] ? argv[0] : "get"))
+	if (ni_string_printf(&program, "%s %s", caller  ? caller  : "wicked",
+						argv[0] ? argv[0] : "duid"))
 		argv[0] = program;
 
 	optind = 1;
@@ -99,129 +196,18 @@ ni_do_duid_get(const char *caller, int argc, char **argv)
 		usage:
 			fprintf(stderr,
 				"\nUsage:\n"
-				"  %s [options]\n"
-				"\n"
-				"Options:\n"
-				"  --help, -h      show this help text and exit.\n"
-				"  --ifname <name> show non-standard per-device duid\n"
-				"\n", program);
-			goto cleanup;
-		}
-	}
-
-	if (optind != argc) {
-		fprintf(stderr, "%s: invalid arguments\n", program);
-		goto usage;
-	}
-
-	status = NI_WICKED_RC_ERROR;
-	if (!(map = ni_duid_map_load(NULL)))
-		goto cleanup;
-
-	status = NI_WICKED_RC_NO_DEVICE;
-	if (ni_duid_map_get_duid(map, ifname, &duid)) {
-		printf("%s\t%s\n", ifname ? ifname : "default", duid);
-		status = NI_WICKED_RC_SUCCESS;
-	}
-
-cleanup:
-	ni_string_free(&program);
-	ni_duid_map_free(map);
-	return status;
-}
-
-static int
-ni_do_duid_set(const char *caller, int argc, char **argv)
-{
-	ni_duid_map_t *map;
-	const char *ifname = NULL;
-	ni_opaque_t raw;
-	int status;
-
-	if (argc != 3 || ni_string_empty(argv[2]))
-		return NI_WICKED_RC_USAGE;
-
-	if (!ni_duid_parse_hex(&raw, argv[2]))
-		return NI_WICKED_RC_USAGE;
-
-	if (!ni_string_eq(argv[1], "default"))
-		ifname = argv[1];
-
-	if (!(map = ni_duid_map_load(NULL)))
-		return NI_WICKED_RC_ERROR;
-
-	status = NI_WICKED_RC_ERROR;
-	if (ni_duid_map_set(map, ifname, argv[2])) {
-		if (ni_duid_map_save(map))
-			status = NI_WICKED_RC_SUCCESS;
-	}
-
-	ni_duid_map_free(map);
-	return status;
-}
-
-static int
-ni_do_duid_del(const char *caller, int argc, char **argv)
-{
-	ni_duid_map_t *map;
-	const char *ifname = NULL;
-	int status;
-
-	if (argc != 2)
-		return NI_WICKED_RC_USAGE;
-
-	if (!ni_string_eq(argv[1], "default"))
-		ifname = argv[1];
-
-	if (!(map = ni_duid_map_load(NULL)))
-		return NI_WICKED_RC_ERROR;
-
-	status = NI_WICKED_RC_ERROR;
-	if (ni_duid_map_del(map, ifname)) {
-		if (ni_duid_map_save(map))
-			status = NI_WICKED_RC_SUCCESS;
-	}
-
-	ni_duid_map_free(map);
-	return status;
-}
-
-int
-ni_do_duid(const char *caller, int argc, char **argv)
-{
-	enum { OPT_HELP = 'h' };
-	static struct option	options[] = {
-		{ "help",	no_argument,	NULL,	'h'	},
-		{ NULL,		no_argument,	NULL,	0	}
-	};
-	int opt = 0, status = NI_WICKED_RC_USAGE;
-	char *program = NULL;
-	const char *cmd;
-
-	if (ni_string_printf(&program, "%s %s", caller  ? caller  : "wicked",
-						argv[0] ? argv[0] : "test"))
-		argv[0] = program;
-
-	optind = 1;
-	while ((opt = getopt_long(argc, argv, "+h", options, NULL)) != EOF) {
-		switch (opt) {
-		case OPT_HELP:
-			status = NI_WICKED_RC_SUCCESS;
-		default:
-		usage:
-			fprintf(stderr,
-				"\nUsage:\n"
 				"  %s <command>\n"
 				"\n"
 				"Options:\n"
-				"  --help, -h      show this help text and exit.\n"
+				"  --help, -h          show this help text and exit.\n"
+				"  --ifname|-i <name>  use on non-standard per-device duid\n"
 				"\n"
 				"Commands:\n"
 				"  help\n"
 				"  dump\n"
-				"  get [get options]\n"
-				"  del [get options]\n"
-				"  set [set options] <duid>\n"
+				"  get [options]\n"
+				"  del [options]\n"
+				"  set [options] <duid>\n"
 				"\n", argv[0]);
 			goto cleanup;
 		}
@@ -233,27 +219,30 @@ ni_do_duid(const char *caller, int argc, char **argv)
 	}
 
 	cmd = argv[optind];
+	ni_string_printf(&command, "%s %s", program, cmd);
+
 	if (ni_string_eq(cmd, "help")) {
 		status = NI_WICKED_RC_SUCCESS;
 		goto usage;
 	} else
 	if (ni_string_eq(cmd, "dump")) {
-		status = ni_do_duid_dump(program, argc - optind, argv + optind);
+		status = ni_do_duid_dump(command, ifname, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "get")) {
-		status = ni_do_duid_get (program, argc - optind, argv + optind);
+		status = ni_do_duid_get (command, ifname, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "set")) {
-		status = ni_do_duid_set (program, argc - optind, argv + optind);
+		status = ni_do_duid_set (command, ifname, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "del")) {
-		status = ni_do_duid_del (program, argc - optind, argv + optind);
+		status = ni_do_duid_del (command, ifname, argc - optind, argv + optind);
 	} else {
 		fprintf(stderr, "%s: unsupported command %s\n", program, cmd);
 		goto usage;
 	}
 
 cleanup:
+	ni_string_free(&command);
 	ni_string_free(&program);
 	return status;
 }
