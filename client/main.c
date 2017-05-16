@@ -179,6 +179,7 @@ main(int argc, char **argv)
 				"  convert     [subcommand]\n"
 				"  xpath       [options] expr ...\n"
 				"  test        [subcommand]\n"
+				"  duid        [subcommand]\n"
 				"  arp         [options] <ifname> <IP>\n"
 				"\n", program);
 			goto done;
@@ -312,6 +313,9 @@ main(int argc, char **argv)
 	} else
 	if (!strcmp(cmd, "convert")) {
 		status = do_convert(argc - optind, argv + optind);
+	} else
+	if (!strcmp(cmd, "duid")) {
+		status = ni_do_duid(program, argc - optind, argv + optind);
 	} else
 	if (!strcmp(cmd, "test")) {
 		status = ni_do_test(program, argc - optind, argv + optind);

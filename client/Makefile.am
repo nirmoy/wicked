@@ -53,6 +53,7 @@ endif
 wicked_SOURCES			= \
 	arputil.c		\
 	compat.c		\
+	duid.c			\
 	ifup.c			\
 	ifdown.c		\
 	ifcheck.c		\
