@@ -33,32 +33,73 @@
 
 #include <wicked/types.h>
 #include <wicked/util.h>
+#include <wicked/netinfo.h>
 #include "duid.h"
 
 static int
 ni_do_duid_get(const char *caller, int argc, char **argv)
 {
-	ni_duid_map_t *map;
+	enum { OPT_HELP = 'h', OPT_IFNAME = 'i' };
+	static struct option	options[] = {
+		{ "help",	no_argument,		NULL,	OPT_HELP	},
+		{ "ifname",	required_argument,	NULL,	OPT_IFNAME	},
+		{ NULL,		no_argument,		NULL,	0		}
+	};
+	int opt = 0, status = NI_WICKED_RC_USAGE;
+	ni_duid_map_t *map = NULL;
 	const char *ifname = NULL;
 	const char *duid = NULL;
-	int status;
+	char *program = NULL;
 
-	if (argc != 2)
-		return NI_WICKED_RC_USAGE;
+	if (ni_string_printf(&program, "%s %s", caller  ? caller  : "wicked duid",
+						argv[0] ? argv[0] : "get"))
+		argv[0] = program;
 
-	if (!ni_string_eq(argv[1], "default"))
-		ifname = argv[1];
+	optind = 1;
+	while ((opt = getopt_long(argc, argv, "+hi:", options, NULL)) != EOF) {
+		switch (opt) {
+		case OPT_IFNAME:
+			if (!ni_netdev_name_is_valid(optarg)) {
+				ni_error("%s: invalid interface name %s",
+						program, optarg);
+				goto cleanup;
+			}
+			ifname = optarg;
+			break;
 
+		case OPT_HELP:
+			status = NI_WICKED_RC_SUCCESS;
+		default:
+		usage:
+			fprintf(stderr,
+				"\nUsage:\n"
+				"  %s [options]\n"
+				"\n"
+				"Options:\n"
+				"  --help, -h      show this help text and exit.\n"
+				"  --ifname <name> show non-standard per-device duid\n"
+				"\n", program);
+			goto cleanup;
+		}
+	}
+
+	if (optind != argc) {
+		ni_error("%s: invalid arguments\n", program);
+		goto usage;
+	}
+
+	status = NI_WICKED_RC_ERROR;
 	if (!(map = ni_duid_map_load(NULL)))
-		return NI_WICKED_RC_ERROR;
+		goto cleanup;
 
+	status = NI_WICKED_RC_NO_DEVICE;
 	if (ni_duid_map_get_duid(map, ifname, &duid)) {
 		printf("%s\t%s\n", ifname ? ifname : "default", duid);
 		status = NI_WICKED_RC_SUCCESS;
-	} else {
-		status = NI_WICKED_RC_NO_DEVICE;
 	}
 
+cleanup:
+	ni_string_free(&program);
 	ni_duid_map_free(map);
 	return status;
 }
@@ -150,6 +191,9 @@ ni_do_duid(const char *caller, int argc, char **argv)
 				"  --help, -h      show this help text and exit.\n"
 				"\n"
 				"Commands:\n"
+				"  get [default|ifname]\n"
+				"  set <default|ifname>\n"
+				"  del <default|ifname>\n"
 				"\n", argv[0]);
 			goto cleanup;
 		}
