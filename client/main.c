@@ -55,8 +55,7 @@
 #include "ifcheck.h"
 #include "ifreload.h"
 #include "ifstatus.h"
-#include "arputil.h"
-#include "tester.h"
+#include "main.h"
 
 enum {
 	OPT_HELP,
@@ -318,7 +317,7 @@ main(int argc, char **argv)
 		status = ni_do_test(program, argc - optind, argv + optind);
 	} else
 	if (!strcmp(cmd, "arp")) {
-		status = ni_do_arp(argc - optind, argv + optind);
+		status = ni_do_arp(program, argc - optind, argv + optind);
 	} else {
 		fprintf(stderr, "Unsupported command %s\n", cmd);
 		goto usage;

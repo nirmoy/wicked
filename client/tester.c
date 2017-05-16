@@ -37,13 +37,12 @@
 #include <wicked/address.h>
 #include <wicked/addrconf.h>
 
-#include "tester.h"
 #include "dhcp4/tester.h"
 #include "dhcp6/tester.h"
 #include "netinfo_priv.h"
 
 
-int
+static int
 ni_do_test_dhcp4(const char *caller, int argc, char **argv)
 {
 	enum {
@@ -155,7 +154,7 @@ cleanup:
 	return status;
 }
 
-int
+static int
 ni_do_test_dhcp6(const char *caller, int argc, char **argv)
 {
 	enum {

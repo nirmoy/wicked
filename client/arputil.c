@@ -1,7 +1,7 @@
 /*
  *	wicked client arp actions and utilities
  *
- *	Copyright (C) 2014 SUSE LINUX Products GmbH, Nuernberg, Germany.
+ *	Copyright (C) 2014-2017 SUSE LINUX GmbH, Nuernberg, Germany.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -13,10 +13,8 @@
  *	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *	GNU General Public License for more details.
  *
- *	You should have received a copy of the GNU General Public License along
- *	with this program; if not, see <http://www.gnu.org/licenses/> or write
- *	to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- *	Boston, MA 02110-1301 USA.
+ *	You should have received a copy of the GNU General Public License
+ *	along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  *	Authors:
  *		Marius Tomaschewski <mt@suse.de>
@@ -290,7 +288,7 @@ __do_arp_validate(struct arp_handle *handle)
 }
 
 int
-ni_do_arp(int argc, char **argv)
+ni_do_arp(const char *caller, int argc, char **argv)
 {
 	static struct option      options[] = {
 		{ "help",         no_argument,       NULL, OPT_HELP        },
@@ -308,11 +306,16 @@ ni_do_arp(int argc, char **argv)
 	unsigned int      opt_nprobes;
 	unsigned int      opt_nclaims;
 	struct arp_handle handle;
+	char *program = NULL;
 
 	memset(&handle, 0, sizeof(handle));
 	handle.nprobes = opt_nprobes = 3;
 	handle.nclaims = opt_nclaims = 0;
 	handle.timeout = 200;
+
+	if (ni_string_printf(&program, "%s %s", caller  ? caller  : "wicked",
+						argv[0] ? argv[0] : "arp"))
+		argv[0] = program;
 
 	optind = 1;
 	while ((c = getopt_long(argc, argv, "", options, NULL)) != EOF) {
@@ -322,7 +325,7 @@ ni_do_arp(int argc, char **argv)
 		default:
 		usage:
 			fprintf(stderr,
-				"wicked %s [options ...] <ifname> <IP address>\n"
+				"%s [options ...] <ifname> <IP address>\n"
 				"\n"
 				"Supported options:\n"
 				"  --help\n"
@@ -416,6 +419,6 @@ ni_do_arp(int argc, char **argv)
 	}
 
 cleanup:
+	ni_string_free(&program);
 	return status;
 }
-
