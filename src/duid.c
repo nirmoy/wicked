@@ -844,3 +844,25 @@ ni_duid_map_del(ni_duid_map_t *map, const char *name)
 	return FALSE;
 }
 
+ni_bool_t
+ni_duid_map_to_vars(ni_duid_map_t *map, ni_var_array_t *vars)
+{
+	xml_node_t *root, *node = NULL;
+	const char *name;
+
+	if (!(root = ni_duid_map_root_node(map)) || !vars)
+		return FALSE;
+
+	ni_var_array_destroy(vars);
+	while ((node = ni_duid_map_next_node(root, node))) {
+		if (ni_string_empty(node->cdata))
+			continue;
+
+		name = xml_node_get_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE);
+		/* all functions above return 1st match, so skip dups if any */
+		if (!ni_var_array_get(vars, name))
+			ni_var_array_set(vars, name, node->cdata);
+	}
+	return TRUE;
+}
+

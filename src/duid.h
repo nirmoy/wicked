@@ -146,5 +146,6 @@ extern ni_bool_t		ni_duid_map_get_duid(ni_duid_map_t *map, const char *name, con
 extern ni_bool_t		ni_duid_map_get_name(ni_duid_map_t *map, const char *duid, const char **name);
 extern ni_bool_t		ni_duid_map_set(ni_duid_map_t *map, const char *name, const char *duid);
 extern ni_bool_t		ni_duid_map_del(ni_duid_map_t *map, const char *name);
+extern ni_bool_t		ni_duid_map_to_vars(ni_duid_map_t *map, ni_var_array_t *vars);
 
 #endif /* WICKED_DUID_H */
