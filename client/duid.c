@@ -166,13 +166,13 @@ ni_do_duid(const char *caller, int argc, char **argv)
 		goto usage;
 	} else
 	if (ni_string_eq(cmd, "get")) {
-		status = ni_do_duid_get (program, argc - 1, argv + 1);
+		status = ni_do_duid_get (program, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "set")) {
-		status = ni_do_duid_set (program, argc - 1, argv + 1);
+		status = ni_do_duid_set (program, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "del")) {
-		status = ni_do_duid_del (program, argc - 1, argv + 1);
+		status = ni_do_duid_del (program, argc - optind, argv + optind);
 	} else {
 		fprintf(stderr, "%s: unsupported command %s\n", program, cmd);
 		goto usage;
