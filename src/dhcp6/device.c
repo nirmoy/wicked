@@ -869,12 +869,23 @@ static ni_bool_t
 ni_dhcp6_config_init_duid(ni_dhcp6_device_t *dev, ni_dhcp6_config_t *config, const char *preferred)
 {
 	ni_bool_t save = TRUE;
+#if 0
+	/* user explicitly requested a client-id to use */
+	if (preferred) {
+		ni_duid_parse_hex(&config->client_duid, preferred);
+	}
 
+	/* user configured a default-duid via appconfig */
+	if (config->client_duid.len == 0) {
+		ni_dhcp6_config_default_duid(&config->client_duid, dev->ifname);
+	}
+
+#else
 	if (preferred) {
 		ni_duid_parse_hex(&config->client_duid, preferred);
 	}
 	if (config->client_duid.len == 0) {
-		ni_dhcp6_config_default_duid(&config->client_duid);
+		ni_dhcp6_config_default_duid(&config->client_duid, dev->ifname);
 	}
 	if (config->client_duid.len == 0 && ni_dhcp6_duid.len > 0) {
 		ni_duid_copy(&config->client_duid, &ni_dhcp6_duid);
@@ -892,6 +903,7 @@ ni_dhcp6_config_init_duid(ni_dhcp6_device_t *dev, ni_dhcp6_config_t *config, con
 	if (config->client_duid.len > 0 && !ni_dhcp6_duid.len) {
 		ni_duid_copy(&ni_dhcp6_duid, &config->client_duid);
 	}
+#endif
 	return (config->client_duid.len > 0);
 }
 
@@ -1318,18 +1330,18 @@ ni_dhcp6_device_transmit(ni_dhcp6_device_t *dev)
 /*
  * Functions for accessing various global DHCP configuration options
  */
-const char *
-ni_dhcp6_config_default_duid(ni_opaque_t *duid)
+ni_bool_t
+ni_dhcp6_config_default_duid(ni_opaque_t *duid, const char *ifname)
 {
-	const struct ni_config_dhcp6 *dhconf = &ni_global.config->addrconf.dhcp6;
+	const char *default_duid = ni_config_dhcp6_default_duid(ifname);
 
-	if (ni_string_empty(dhconf->default_duid))
-		return NULL;
+	if (ni_string_empty(default_duid))
+		return FALSE;
 
-	if (!ni_duid_parse_hex(duid, dhconf->default_duid))
-		return NULL;
+	if (!ni_duid_parse_hex(duid, default_duid))
+		return FALSE;
 
-	return dhconf->default_duid;
+	return TRUE;
 }
 
 int
