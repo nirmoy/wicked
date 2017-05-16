@@ -37,6 +37,32 @@
 #include "duid.h"
 
 static int
+ni_do_duid_dump(const char *caller, int argc, char **argv)
+{
+	ni_var_array_t vars = NI_VAR_ARRAY_INIT;
+	ni_duid_map_t *map;
+	ni_var_t *var;
+
+	if (argc != 1)
+		return NI_WICKED_RC_USAGE;
+
+	if (!(map = ni_duid_map_load(NULL)))
+		return NI_WICKED_RC_ERROR;
+
+	if (ni_duid_map_to_vars(map, &vars)) {
+		unsigned int i;
+
+		for (i = 0, var = vars.data; i < vars.count; ++i, ++var) {
+			printf("%s\t%s\n", var->name ? var->name : "default", var->value);
+		}
+		ni_var_array_destroy(&vars);
+	}
+
+	ni_duid_map_free(map);
+	return NI_WICKED_RC_SUCCESS;
+}
+
+static int
 ni_do_duid_get(const char *caller, int argc, char **argv)
 {
 	enum { OPT_HELP = 'h', OPT_IFNAME = 'i' };
@@ -191,9 +217,11 @@ ni_do_duid(const char *caller, int argc, char **argv)
 				"  --help, -h      show this help text and exit.\n"
 				"\n"
 				"Commands:\n"
-				"  get [default|ifname]\n"
-				"  set <default|ifname>\n"
-				"  del <default|ifname>\n"
+				"  help\n"
+				"  dump\n"
+				"  get [get options]\n"
+				"  del [get options]\n"
+				"  set [set options] <duid>\n"
 				"\n", argv[0]);
 			goto cleanup;
 		}
@@ -208,6 +236,9 @@ ni_do_duid(const char *caller, int argc, char **argv)
 	if (ni_string_eq(cmd, "help")) {
 		status = NI_WICKED_RC_SUCCESS;
 		goto usage;
+	} else
+	if (ni_string_eq(cmd, "dump")) {
+		status = ni_do_duid_dump(program, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "get")) {
 		status = ni_do_duid_get (program, argc - optind, argv + optind);
