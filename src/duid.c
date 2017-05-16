@@ -28,9 +28,12 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <unistd.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <wicked/logging.h>
 #include <wicked/netinfo.h>
@@ -39,6 +42,7 @@
 
 #include "duid.h"
 #include "util_priv.h"
+#include "buffer.h"
 
 #ifndef NI_MACHINE_ID_FILE
 #define NI_MACHINE_ID_FILE		"/etc/machine-id"
@@ -47,8 +51,9 @@
 #define NI_DMI_PRODUCT_UUID_FILE	"/sys/devices/virtual/dmi/id/product_uuid";
 #endif
 
-#define CONFIG_DEFAULT_DUID_NODE	"duid"
-#define CONFIG_DEFAULT_DUID_FILE	"duid.xml"
+#define NI_CONFIG_DEFAULT_DUID_NODE	"duid"
+#define NI_CONFIG_DEFAULT_DUID_FILE	"duid.xml"
+#define NI_CONFIG_DEFAULT_DUID_DEVICE	"device"
 
 
 /*
@@ -229,20 +234,20 @@ ni_duid_load(ni_opaque_t *duid, const char *filename, const char *name)
 	int rv;
 
 	if (ni_string_empty(name))
-		name = CONFIG_DEFAULT_DUID_NODE;
+		name = NI_CONFIG_DEFAULT_DUID_NODE;
 
 	if (!filename) {
 		/* On root-fs, state dir used as fallback */
 		snprintf(path, sizeof(path), "%s/%s",
 				ni_config_statedir(),
-				CONFIG_DEFAULT_DUID_FILE);
+				NI_CONFIG_DEFAULT_DUID_FILE);
 		filename = path;
 
 		/* Then the proper, reboot persistent dir */
 		if ((fp = fopen(filename, "re")) == NULL) {
 			snprintf(path, sizeof(path), "%s/%s",
 					ni_config_storedir(),
-					CONFIG_DEFAULT_DUID_FILE);
+					NI_CONFIG_DEFAULT_DUID_FILE);
 			filename = path;
 
 			fp = fopen(filename, "re");
@@ -345,7 +350,7 @@ ni_duid_save(const ni_opaque_t *duid, const char *filename, const char *name)
 	}
 
 	if (ni_string_empty(name))
-		name = CONFIG_DEFAULT_DUID_NODE;
+		name = NI_CONFIG_DEFAULT_DUID_NODE;
 
 	if ((node = xml_node_new(name, NULL)) == NULL) {
 		ni_error("Unable to create %s xml node: %m", name);
@@ -356,7 +361,7 @@ ni_duid_save(const ni_opaque_t *duid, const char *filename, const char *name)
 	if (!filename) {
 		snprintf(path, sizeof(path), "%s/%s",
 				ni_config_storedir(),
-				CONFIG_DEFAULT_DUID_FILE);
+				NI_CONFIG_DEFAULT_DUID_FILE);
 		filename = path;
 	}
 
@@ -366,7 +371,7 @@ ni_duid_save(const ni_opaque_t *duid, const char *filename, const char *name)
 		if (rv == 0) {
 			snprintf(path, sizeof(path), "%s/%s",
 					ni_config_statedir(),
-					CONFIG_DEFAULT_DUID_FILE);
+					NI_CONFIG_DEFAULT_DUID_FILE);
 
 			/* Fallback in state dir is obsolete */
 			unlink(path);
@@ -374,7 +379,7 @@ ni_duid_save(const ni_opaque_t *duid, const char *filename, const char *name)
 		if (rv > 0) {
 			snprintf(path, sizeof(path), "%s/%s",
 					ni_config_statedir(),
-					CONFIG_DEFAULT_DUID_FILE);
+					NI_CONFIG_DEFAULT_DUID_FILE);
 
 			/* Then try state dir as fallback */
 			rv = __ni_duid_save_node(node, path);
@@ -511,5 +516,329 @@ ni_duid_create_uuid_dmi_product_id(ni_opaque_t *duid, const char *filename)
 		return FALSE;
 
 	return ni_duid_init_uuid(duid, &uuid);
+}
+
+struct ni_duid_map {
+	xml_document_t *doc;
+
+	int		fd;
+	char *		file;
+	struct flock	flock;
+};
+
+static ni_duid_map_t *			ni_duid_map_new(void);
+static ni_bool_t			ni_duid_map_lock(ni_duid_map_t *);
+static ni_bool_t			ni_duid_map_unlock(ni_duid_map_t *);
+
+static ni_duid_map_t *
+ni_duid_map_new(void)
+{
+	ni_duid_map_t *map;
+
+	map = calloc(1, sizeof(*map));
+	if (map) {
+		map->fd = -1;
+		map->flock.l_type = F_UNLCK;
+	}
+	return map;
+}
+
+void
+ni_duid_map_free(ni_duid_map_t *map)
+{
+	if (map) {
+		if (map->fd >= 0) {
+			ni_duid_map_unlock(map);
+			close(map->fd);
+			map->fd = -1;
+		}
+		xml_document_free(map->doc);
+		ni_string_free(&map->file);
+		free(map);
+	}
+}
+
+static ni_bool_t
+ni_duid_map_lock(ni_duid_map_t *map)
+{
+	if (!map || map->fd < 0)
+		return FALSE;
+
+	map->flock.l_type   = F_WRLCK;
+	map->flock.l_whence = SEEK_SET;
+	map->flock.l_start  = 0;
+	map->flock.l_len    = 0;
+	map->flock.l_pid    = 0;
+
+	if (fcntl(map->fd,  F_SETLKW, &map->flock) < 0) {
+		map->flock.l_type = F_UNLCK;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static ni_bool_t
+ni_duid_map_unlock(ni_duid_map_t *map)
+{
+	if (!map || map->fd < 0)
+		return FALSE;
+
+	if (map->flock.l_type == F_UNLCK)
+		return TRUE;
+
+	map->flock.l_type   = F_UNLCK;
+	map->flock.l_whence = SEEK_SET;
+	map->flock.l_start  = 0;
+	map->flock.l_len    = 0;
+	map->flock.l_pid    = 0;
+
+	if (fcntl(map->fd,  F_SETLKW, &map->flock) < 0)
+		return FALSE;
+	return TRUE;
+}
+
+static ni_bool_t
+ni_duid_map_open(ni_duid_map_t *map)
+{
+	int flags = O_CLOEXEC | O_NOCTTY | O_RDWR | O_CREAT;
+	int mode = S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH;
+
+	if (!map || map->fd >= 0 || ni_string_empty(map->file))
+		return FALSE;
+
+	map->fd = open(map->file, flags, mode);
+	if (map->fd < 0)
+		return FALSE;
+	return TRUE;
+}
+
+ni_bool_t
+ni_duid_map_set_default_file(char **filename)
+{
+	return ni_string_printf(filename, "%s/%s",
+			ni_config_storedir(),
+			NI_CONFIG_DEFAULT_DUID_FILE) != NULL;
+}
+
+ni_bool_t
+ni_duid_map_set_fallback_file(char **filename)
+{
+	return ni_string_printf(filename, "%s/%s",
+			ni_config_statedir(),
+			NI_CONFIG_DEFAULT_DUID_FILE) != NULL;
+}
+
+ni_duid_map_t *
+ni_duid_map_load(const char *filename)
+{
+	ni_duid_map_t *map;
+	ni_buffer_t buff;
+	struct stat stb;
+	ssize_t len;
+
+	if (!(map = ni_duid_map_new())) {
+		ni_error("unable to allocate memory for duid map: %m");
+		return NULL;
+	}
+
+	if (filename) {
+		if (!ni_string_dup(&map->file, filename)) {
+			ni_error("unable to copy custom duid map file name (%s): %m", filename);
+			goto failure;
+		}
+
+		if (!ni_duid_map_open(map)) {
+			ni_error("unable to open duid map file name (%s): %m", map->file);
+			goto failure;
+		}
+	} else {
+		if (!ni_duid_map_set_default_file(&map->file)) {
+			ni_error("unable to construct default duid map file name: %m");
+			goto failure;
+		}
+
+		if (!ni_duid_map_open(map)) {
+			ni_debug_readwrite("unable to open duid map file name (%s): %m", map->file);
+
+			if (!ni_duid_map_set_fallback_file(&map->file)) {
+				ni_error("unable to construct fallback duid map file name: %m");
+				goto failure;
+			}
+
+			if (!ni_duid_map_open(map)) {
+				ni_error("unable to open duid map file name (%s): %m", map->file);
+				goto failure;
+			}
+		}
+	}
+
+	if (!ni_duid_map_lock(map)) {
+		ni_error("unable to lock duid map file name (%s): %m", map->file);
+		goto failure;
+	}
+
+	if (fstat(map->fd, &stb) < 0)
+		stb.st_size = BUFSIZ;
+
+	ni_buffer_init_dynamic(&buff, stb.st_size);
+	do {
+		if (!ni_buffer_tailroom(&buff))
+			ni_buffer_ensure_tailroom(&buff, BUFSIZ);
+
+		do {
+			len = read(map->fd, ni_buffer_tail(&buff), ni_buffer_tailroom(&buff));
+			if (len > 0)
+				ni_buffer_push_tail(&buff, len);
+		} while (len < 0 && errno == EINTR);
+	} while (len > 0);
+
+	map->doc = xml_document_from_buffer(&buff, map->file);
+	ni_buffer_destroy(&buff);
+	if (!map->doc)
+		map->doc = xml_document_new();
+
+	return map;
+failure:
+	ni_duid_map_free(map);
+	return NULL;
+}
+
+ni_bool_t
+ni_duid_map_save(ni_duid_map_t *map)
+{
+	char *data = NULL;
+	size_t off, len;
+	ssize_t ret;
+
+	if (!map || map->fd < 0)
+		return FALSE;
+
+	if (lseek(map->fd, 0, SEEK_SET) < 0)
+		return FALSE;
+
+	if (ftruncate(map->fd, 0) < 0)
+		return FALSE;
+
+	if (map->doc && map->doc->root)
+		data = xml_node_sprint(map->doc->root);
+
+	len = ni_string_len(data);
+	off = 0;
+	ret = 0;
+	while (len > off) {
+		ret = write(map->fd, data + off, len - off);
+		if (ret < 0 && errno != EINTR)
+			break;
+		else
+		if (ret > 0)
+			off += ret;
+	}
+	free(data);
+
+	return ret < 0 ? FALSE : TRUE;
+}
+
+static xml_node_t *
+ni_duid_map_root_node(ni_duid_map_t *map)
+{
+	if (!map || !map->doc)
+		return NULL;
+	return xml_document_root(map->doc);
+}
+
+static xml_node_t *
+ni_duid_map_next_node(const xml_node_t *root, const xml_node_t *last)
+{
+	return xml_node_get_next_child(root, NI_CONFIG_DEFAULT_DUID_NODE, last);
+}
+
+ni_bool_t
+ni_duid_map_get_duid(ni_duid_map_t *map, const char *name, const char **duid)
+{
+	xml_node_t *root, *node = NULL;
+	const char *attr;
+
+	if (!(root = ni_duid_map_root_node(map)) || !duid)
+		return FALSE;
+
+	while ((node = ni_duid_map_next_node(root, node))) {
+		attr = xml_node_get_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE);
+		if (ni_string_empty(node->cdata))
+			continue;
+		if (!ni_string_eq(name, attr))
+			continue;
+
+		*duid = node->cdata;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+ni_bool_t
+ni_duid_map_get_name(ni_duid_map_t *map, const char *duid, const char **name)
+{
+	xml_node_t *root, *node = NULL;
+
+	if (!(root = ni_duid_map_root_node(map)) || !name)
+		return FALSE;
+
+	while ((node = ni_duid_map_next_node(root, node))) {
+		if (ni_string_empty(node->cdata))
+			continue;
+		if (!ni_string_eq(duid, node->cdata))
+			continue;
+
+		*name = xml_node_get_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+ni_bool_t
+ni_duid_map_set(ni_duid_map_t *map, const char *name, const char *duid)
+{
+	xml_node_t *root, *node = NULL;
+	const char *attr;
+
+	/* TODO: parse duid string to not store crap? */
+	if (!(root = ni_duid_map_root_node(map)) || ni_string_empty(duid))
+		return FALSE;
+
+	while ((node = ni_duid_map_next_node(root, node))) {
+		attr = xml_node_get_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE);
+		if (!ni_string_eq(name, attr))
+			continue;
+
+		xml_node_set_cdata(node, duid);
+		return TRUE;
+	}
+	if ((node = xml_node_new(NI_CONFIG_DEFAULT_DUID_NODE, root))) {
+		if (!ni_string_empty(name))
+			xml_node_add_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE, name);
+		xml_node_set_cdata(node, duid);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+ni_bool_t
+ni_duid_map_del(ni_duid_map_t *map, const char *name)
+{
+	xml_node_t *root, *node = NULL;
+	const char *attr;
+
+	if (!(root = ni_duid_map_root_node(map)))
+		return FALSE;
+
+	while ((node = ni_duid_map_next_node(root, node))) {
+		attr = xml_node_get_attr(node, NI_CONFIG_DEFAULT_DUID_DEVICE);
+		if (!ni_string_eq(name, attr))
+			continue;
+
+		xml_node_detach(node);
+		xml_node_free(node);
+		return TRUE;
+	}
+	return FALSE;
 }
 

@@ -103,6 +103,8 @@ typedef struct ni_duid_uuid {
 } ni_duid_uuid_t;
 
 
+typedef struct ni_duid_map	ni_duid_map_t;
+
 extern const char *		ni_duid_type_to_name(unsigned int type);
 extern ni_bool_t		ni_duid_type_by_name(const char *name, unsigned int *type);
 
@@ -131,5 +133,14 @@ extern ni_bool_t		ni_duid_create_llt(ni_opaque_t *duid, const char *hwtype, cons
 extern ni_bool_t		ni_duid_create_uuid_string(ni_opaque_t *duid, const char *string);
 extern ni_bool_t		ni_duid_create_uuid_machine_id(ni_opaque_t *duid, const char *filename);
 extern ni_bool_t		ni_duid_create_uuid_dmi_product_id(ni_opaque_t *duid, const char *filename);
+
+extern ni_duid_map_t *		ni_duid_map_load(const char *filename);
+extern ni_bool_t		ni_duid_map_save(ni_duid_map_t *map);
+extern void			ni_duid_map_free(ni_duid_map_t *map);
+
+extern ni_bool_t		ni_duid_map_get_duid(ni_duid_map_t *map, const char *name, const char **duid);
+extern ni_bool_t		ni_duid_map_get_name(ni_duid_map_t *map, const char *duid, const char **name);
+extern ni_bool_t		ni_duid_map_set(ni_duid_map_t *map, const char *name, const char *duid);
+extern ni_bool_t		ni_duid_map_del(ni_duid_map_t *map, const char *name);
 
 #endif /* __WICKED_DUID_H__ */
