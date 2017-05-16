@@ -60,8 +60,8 @@ ni_do_duid_get(const char *caller, int argc, char **argv)
 		switch (opt) {
 		case OPT_IFNAME:
 			if (!ni_netdev_name_is_valid(optarg)) {
-				ni_error("%s: invalid interface name %s",
-						program, optarg);
+				fprintf(stderr, "%s: invalid interface name '%s'\n", program,
+						ni_print_suspect(optarg, ni_string_len(optarg)));
 				goto cleanup;
 			}
 			ifname = optarg;
@@ -84,7 +84,7 @@ ni_do_duid_get(const char *caller, int argc, char **argv)
 	}
 
 	if (optind != argc) {
-		ni_error("%s: invalid arguments\n", program);
+		fprintf(stderr, "%s: invalid arguments\n", program);
 		goto usage;
 	}
 
