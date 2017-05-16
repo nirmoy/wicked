@@ -35,6 +35,89 @@
 #include <wicked/util.h>
 #include "duid.h"
 
+static int
+ni_do_duid_get(const char *caller, int argc, char **argv)
+{
+	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	const char *ifname = NULL;
+	const char *duid = NULL;
+	int status;
+
+	if (argc != 2)
+		return NI_WICKED_RC_USAGE;
+
+	if (!ni_string_eq(argv[1], "default"))
+		ifname = argv[1];
+
+	if (!(map = ni_duid_map_load(NULL)))
+		return NI_WICKED_RC_ERROR;
+
+	if (ni_duid_map_get_duid(map, ifname, &duid)) {
+		printf("%s\t%s\n", ifname ? ifname : "default", duid);
+		status = NI_WICKED_RC_SUCCESS;
+	} else {
+		status = NI_WICKED_RC_NO_DEVICE;
+	}
+
+	ni_duid_map_free(map);
+	return status;
+}
+
+static int
+ni_do_duid_set(const char *caller, int argc, char **argv)
+{
+	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	const char *ifname = NULL;
+	ni_opaque_t raw;
+	int status;
+
+	if (argc != 3 || ni_string_empty(argv[2]))
+		return NI_WICKED_RC_USAGE;
+
+	if (!ni_duid_parse_hex(&raw, argv[2]))
+		return NI_WICKED_RC_USAGE;
+
+	if (!ni_string_eq(argv[1], "default"))
+		ifname = argv[1];
+
+	if (!(map = ni_duid_map_load(NULL)))
+		return NI_WICKED_RC_ERROR;
+
+	status = NI_WICKED_RC_ERROR;
+	if (ni_duid_map_set(map, ifname, argv[2])) {
+		if (ni_duid_map_save(map))
+			status = NI_WICKED_RC_SUCCESS;
+	}
+
+	ni_duid_map_free(map);
+	return status;
+}
+
+static int
+ni_do_duid_del(const char *caller, int argc, char **argv)
+{
+	ni_duid_map_t *map = ni_duid_map_load(NULL);
+	const char *ifname = NULL;
+	int status;
+
+	if (argc != 2)
+		return NI_WICKED_RC_USAGE;
+
+	if (!ni_string_eq(argv[1], "default"))
+		ifname = argv[1];
+
+	if (!(map = ni_duid_map_load(NULL)))
+		return NI_WICKED_RC_ERROR;
+
+	status = NI_WICKED_RC_ERROR;
+	if (ni_duid_map_del(map, ifname)) {
+		if (ni_duid_map_save(map))
+			status = NI_WICKED_RC_SUCCESS;
+	}
+
+	ni_duid_map_free(map);
+	return status;
+}
 
 int
 ni_do_duid(const char *caller, int argc, char **argv)
@@ -81,6 +164,15 @@ ni_do_duid(const char *caller, int argc, char **argv)
 	if (ni_string_eq(cmd, "help")) {
 		status = NI_WICKED_RC_SUCCESS;
 		goto usage;
+	} else
+	if (ni_string_eq(cmd, "get")) {
+		status = ni_do_duid_get (program, argc - 1, argv + 1);
+	} else
+	if (ni_string_eq(cmd, "set")) {
+		status = ni_do_duid_set (program, argc - 1, argv + 1);
+	} else
+	if (ni_string_eq(cmd, "del")) {
+		status = ni_do_duid_del (program, argc - 1, argv + 1);
 	} else {
 		fprintf(stderr, "%s: unsupported command %s\n", program, cmd);
 		goto usage;
