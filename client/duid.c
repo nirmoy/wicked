@@ -367,6 +367,10 @@ ni_do_duid_get(const char *command, int argc, char **argv)
 	if (ni_duid_map_get_duid(map, ifname, &duid)) {
 		printf("%s\t%s\n", ifname ? ifname : "default", duid);
 		status = NI_WICKED_RC_SUCCESS;
+	} else
+	if (ifname && ni_duid_map_get_duid(map, NULL, &duid)) {
+		printf("%s\t%s\n", "default", duid);
+		status = NI_WICKED_RC_SUCCESS;
 	}
 
 cleanup:
