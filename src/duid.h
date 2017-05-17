@@ -112,6 +112,10 @@ typedef struct ni_duid_map	ni_duid_map_t;
 extern const char *		ni_duid_type_to_name(unsigned int type);
 extern ni_bool_t		ni_duid_type_by_name(const char *name, unsigned int *type);
 
+extern const ni_intmap_t *	ni_duid_hwtype_map(void);
+extern const char *		ni_duid_hwtype_to_name(unsigned int hwtype);
+extern ni_bool_t		ni_duid_hwtype_by_name(const char *name, unsigned int *hwtype);
+
 extern ni_bool_t		ni_duid_init_llt(ni_opaque_t *duid, unsigned short hwtype, const void *hwaddr, size_t len);
 extern ni_bool_t		ni_duid_init_ll (ni_opaque_t *duid, unsigned short hwtype, const void *hwaddr, size_t len);
 extern ni_bool_t		ni_duid_init_en (ni_opaque_t *duid, unsigned int enumber, const void *identifier, size_t len);
