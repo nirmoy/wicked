@@ -342,6 +342,7 @@ ni_do_duid_get(const char *command, int argc, char **argv)
 	switch (argc) {
 	case 2:
 		ifname = argv[--argc];
+	case 1:
 		break;
 	default:
 		fprintf(stderr, "Usage: %s [ifname|default]\n", command);
@@ -436,6 +437,7 @@ ni_do_duid_del(const char *command, int argc, char **argv)
 	switch (argc) {
 	case 2:
 		ifname = argv[--argc];
+	case 1:
 		break;
 	default:
 		fprintf(stderr, "Usage: %s [ifname|default]\n", command);
