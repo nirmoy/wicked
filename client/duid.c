@@ -349,7 +349,7 @@ ni_do_duid_get(const char *command, int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (ni_string_eq(ifname, "default")) {
+	if (!ifname || ni_string_eq(ifname, "default")) {
 		ifname = NULL;
 	} else
 	if (!ni_netdev_name_is_valid(ifname)) {
@@ -396,7 +396,7 @@ ni_do_duid_set(const char *command, int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (ni_string_eq(ifname, "default")) {
+	if (!ifname || ni_string_eq(ifname, "default")) {
 		ifname = NULL;
 	} else
 	if (!ni_netdev_name_is_valid(ifname)) {
@@ -444,7 +444,7 @@ ni_do_duid_del(const char *command, int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (ni_string_eq(ifname, "default")) {
+	if (!ifname || ni_string_eq(ifname, "default")) {
 		ifname = NULL;
 	} else
 	if (!ni_netdev_name_is_valid(ifname)) {
