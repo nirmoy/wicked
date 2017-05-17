@@ -297,15 +297,18 @@ cleanup:
 
 
 static int
-ni_do_duid_dump(const char *command, const char *ifname, int argc, char **argv)
+ni_do_duid_dump(const char *command, int argc, char **argv)
 {
 	ni_var_array_t vars = NI_VAR_ARRAY_INIT;
 	int status = NI_WICKED_RC_USAGE;
 	ni_duid_map_t *map = NULL;
 	ni_var_t *var;
 
-	if (argc != 1 || ifname) {
-		fprintf(stderr, "%s: invalid arguments\n", command);
+	switch (argc) {
+	case 1:
+		break;
+	default:
+		fprintf(stderr, "Usage: %s\n", command);
 		goto cleanup;
 	}
 
@@ -329,14 +332,29 @@ cleanup:
 }
 
 static int
-ni_do_duid_get(const char *command, const char *ifname, int argc, char **argv)
+ni_do_duid_get(const char *command, int argc, char **argv)
 {
 	int status = NI_WICKED_RC_USAGE;
 	ni_duid_map_t *map = NULL;
+	const char *ifname = NULL;
 	const char *duid = NULL;
 
-	if (argc != 1) {
-		fprintf(stderr, "%s: invalid arguments\n", command);
+	switch (argc) {
+	case 2:
+		ifname = argv[--argc];
+		break;
+	default:
+		fprintf(stderr, "Usage: %s [ifname|default]\n", command);
+		goto cleanup;
+	}
+
+	if (ni_string_eq(ifname, "default")) {
+		ifname = NULL;
+	} else
+	if (!ni_netdev_name_is_valid(ifname)) {
+		fprintf(stderr, "%s: invalid interface name '%s'\n", command,
+				ni_print_suspect(ifname, ni_string_len(ifname)));
+		status = NI_WICKED_RC_ERROR;
 		goto cleanup;
 	}
 
@@ -356,24 +374,38 @@ cleanup:
 }
 
 static int
-ni_do_duid_set(const char *command, const char *ifname, int argc, char **argv)
+ni_do_duid_set(const char *command, int argc, char **argv)
 {
 	int status = NI_WICKED_RC_USAGE;
 	ni_duid_map_t *map = NULL;
+	const char *ifname = NULL;
 	const char *duid = NULL;
 	ni_opaque_t raw;
 
-	if (argc != 2) {
-		fprintf(stderr, "%s: invalid arguments\n", command);
+	switch (argc) {
+	case 3:
+		duid   = argv[--argc];
+		ifname = argv[--argc];
+		break;
+	case 2:
+		duid   = argv[--argc];
+		break;
+	default:
+		fprintf(stderr, "Usage: %s [ifname|default] <duid>\n", command);
 		goto cleanup;
 	}
 
-	duid = argv[1];
-	if (ni_string_empty(duid)) {
-		fprintf(stderr, "%s: missing duid argument\n", command);
-		goto cleanup;
+	if (ni_string_eq(ifname, "default")) {
+		ifname = NULL;
 	} else
-	if (!ni_duid_parse_hex(&raw, duid)) {
+	if (!ni_netdev_name_is_valid(ifname)) {
+		fprintf(stderr, "%s: invalid interface name '%s'\n", command,
+				ni_print_suspect(ifname, ni_string_len(ifname)));
+		status = NI_WICKED_RC_ERROR;
+		goto cleanup;
+	}
+
+	if (ni_string_empty(duid) || !ni_duid_parse_hex(&raw, duid)) {
 		fprintf(stderr, "%s: unable to parse duid hex string\n", command);
 		status = NI_WICKED_RC_ERROR;
 		goto cleanup;
@@ -395,13 +427,28 @@ cleanup:
 }
 
 static int
-ni_do_duid_del(const char *command, const char *ifname, int argc, char **argv)
+ni_do_duid_del(const char *command, int argc, char **argv)
 {
 	int status = NI_WICKED_RC_USAGE;
 	ni_duid_map_t *map = NULL;
+	const char *ifname = NULL;
 
-	if (argc != 1) {
-		fprintf(stderr, "%s: invalid arguments\n", command);
+	switch (argc) {
+	case 2:
+		ifname = argv[--argc];
+		break;
+	default:
+		fprintf(stderr, "Usage: %s [ifname|default]\n", command);
+		goto cleanup;
+	}
+
+	if (ni_string_eq(ifname, "default")) {
+		ifname = NULL;
+	} else
+	if (!ni_netdev_name_is_valid(ifname)) {
+		fprintf(stderr, "%s: invalid interface name '%s'\n", command,
+				ni_print_suspect(ifname, ni_string_len(ifname)));
+		status = NI_WICKED_RC_ERROR;
 		goto cleanup;
 	}
 
@@ -487,16 +534,16 @@ ni_do_duid(const char *caller, int argc, char **argv)
 		goto usage;
 	} else
 	if (ni_string_eq(cmd, "dump")) {
-		status = ni_do_duid_dump(command, ifname, argc - optind, argv + optind);
+		status = ni_do_duid_dump(command, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "get")) {
-		status = ni_do_duid_get (command, ifname, argc - optind, argv + optind);
+		status = ni_do_duid_get (command, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "set")) {
-		status = ni_do_duid_set (command, ifname, argc - optind, argv + optind);
+		status = ni_do_duid_set (command, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "del")) {
-		status = ni_do_duid_del (command, ifname, argc - optind, argv + optind);
+		status = ni_do_duid_del (command, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "create")) {
 		status = ni_do_duid_create (command, ifname, argc - optind, argv + optind);
