@@ -55,6 +55,7 @@
  * http://tools.ietf.org/html/rfc3315#section-9.1
  * http://tools.ietf.org/html/rfc6355#section-6
  */
+#define NI_DUID_TYPE_ANY	0		/* unset, not a defined type  */
 #define NI_DUID_TYPE_LLT	1
 #define NI_DUID_TYPE_EN		2
 #define NI_DUID_TYPE_LL		3
@@ -141,6 +142,11 @@ extern ni_bool_t		ni_duid_create_llt(ni_opaque_t *duid, const char *hwtype, cons
 extern ni_bool_t		ni_duid_create_uuid_string(ni_opaque_t *duid, const char *string);
 extern ni_bool_t		ni_duid_create_uuid_machine_id(ni_opaque_t *duid, const char *filename);
 extern ni_bool_t		ni_duid_create_uuid_dmi_product_id(ni_opaque_t *duid, const char *filename);
+
+extern ni_bool_t		ni_duid_generate_device_ll(ni_opaque_t *duid, const ni_netdev_t *dev);
+extern ni_bool_t		ni_duid_generate_device_llt(ni_opaque_t *duid, const ni_netdev_t *dev);
+extern ni_bool_t		ni_duid_generate_device(ni_opaque_t *duid, uint16_t type, const ni_netdev_t *dev);
+extern ni_bool_t		ni_duid_generate(ni_opaque_t *duid, uint16_t type, ni_netconfig_t *nc, const ni_netdev_t *preferred);
 
 extern ni_duid_map_t *		ni_duid_map_load(const char *filename);
 extern ni_bool_t		ni_duid_map_save(ni_duid_map_t *map);

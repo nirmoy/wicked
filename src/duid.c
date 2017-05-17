@@ -556,6 +556,106 @@ ni_duid_create_uuid_dmi_product_id(ni_opaque_t *duid, const char *filename)
 	return ni_duid_init_uuid(duid, &uuid);
 }
 
+ni_bool_t
+ni_duid_generate_device_ll(ni_opaque_t *duid, const ni_netdev_t *dev)
+{
+	if (!duid || !dev || !dev->link.hwaddr.len)
+		return FALSE;
+
+	return ni_duid_init_ll(duid, dev->link.hwaddr.type, dev->link.hwaddr.data, dev->link.hwaddr.len);
+}
+
+ni_bool_t
+ni_duid_generate_device_llt(ni_opaque_t *duid, const ni_netdev_t *dev)
+{
+	if (!duid || !dev || !dev->link.hwaddr.len)
+		return FALSE;
+
+	return ni_duid_init_llt(duid, dev->link.hwaddr.type, dev->link.hwaddr.data, dev->link.hwaddr.len);
+}
+
+ni_bool_t
+ni_duid_generate_device(ni_opaque_t *duid, uint16_t type, const ni_netdev_t *dev)
+{
+	switch (type) {
+	case NI_DUID_TYPE_LL:
+		return ni_duid_generate_device_ll(duid, dev);
+	case NI_DUID_TYPE_LLT:
+		return ni_duid_generate_device_llt(duid, dev);
+	default:
+		return FALSE;
+	}
+}
+
+static ni_bool_t
+ni_duid_generate_ll_type(ni_opaque_t *duid, uint16_t type, ni_netconfig_t *nc, const ni_netdev_t *preferred)
+{
+	const ni_netdev_t *dev;
+
+	if (!duid || (!nc && !(nc = ni_global_state_handle(0))))
+		return FALSE;
+
+	if (preferred && ni_duid_generate_device(duid, type, preferred))
+		return TRUE;
+
+	for (dev = ni_netconfig_devlist(nc); dev; dev = dev->next) {
+		switch (dev->link.hwaddr.type) {
+		case ARPHRD_ETHER:
+		case ARPHRD_IEEE802:
+		case ARPHRD_INFINIBAND:
+			if (ni_duid_generate_device(duid, type, dev))
+				return TRUE;
+		default:
+			break;
+		}
+	}
+	return FALSE;
+}
+
+ni_bool_t
+ni_duid_generate(ni_opaque_t *duid, uint16_t type, ni_netconfig_t *nc, const ni_netdev_t *preferred)
+{
+	ni_uuid_t uuid;
+
+	if (!duid)
+		return FALSE;
+
+	switch (type) {
+	case NI_DUID_TYPE_LL:
+	case NI_DUID_TYPE_LLT:
+		if (ni_duid_generate_ll_type(duid, type, nc, preferred))
+			return TRUE;
+		break;
+
+	case NI_DUID_TYPE_UUID:
+		if (ni_duid_create_uuid_machine_id(duid, NULL))
+			return TRUE;
+		if (ni_duid_create_uuid_dmi_product_id(duid, NULL))
+			return TRUE;
+		break;
+
+	case NI_DUID_TYPE_ANY:
+		if (ni_duid_generate_ll_type(duid, NI_DUID_TYPE_LLT, nc, preferred))
+			return TRUE;
+
+		if (ni_duid_create_uuid_machine_id(duid, NULL))
+			return TRUE;
+		if (ni_duid_create_uuid_dmi_product_id(duid, NULL))
+			return TRUE;
+
+		/* Better using a random uuid than nothing?? */
+		ni_uuid_generate(&uuid);
+		if (ni_duid_init_uuid(duid, &uuid)) {
+			ni_warn("Cannot create stable DUID, fallback to use a random UUID!");
+			return TRUE;
+		}
+
+	default:
+		break;
+	}
+	return FALSE;
+}
+
 struct ni_duid_map {
 	xml_document_t *doc;
 
