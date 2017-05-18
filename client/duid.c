@@ -149,147 +149,139 @@ ni_do_duid_create_duid_uuid_dmi_product_id(const char *ifname)
 }
 
 static int
-ni_do_duid_create_duid_uuid(const char *ifname, const char *uuid)
+ni_do_duid_create_duid_uuid(const char *ifname, char **argv, int argc)
 {
+#if 0
 	ni_opaque_t duid;
+	const char *uuid;
+	int opt = 0;
 
-	if (ni_string_empty(uuid)) {
-		fprintf(stderr, "missing --identifier argument");
-		return NI_WICKED_RC_ERROR;
-	}
+	enum { OPT_MACHINEID='m', OPT_DMIPRODUCTID='p'};
+	static struct option	options[] = {
+		{ "machine-id",	required_argument,		NULL,	OPT_MACHINEID	},
+		{ "dmi-product-id",	required_argument,		NULL,	OPT_DMIPRODUCTID	},
+		{ NULL,		no_argument,		NULL,	0		}
+	};
+	char *machine_id = NULL, *dmi_product_id = NULL;
+	
+	int optind = 1;
 
 	if (ni_duid_create_uuid_string(&duid, uuid) == TRUE)
 		return ni_do_duid_commit(ifname, &duid);
-
+#endif
 	return NI_WICKED_RC_ERROR;
 }
 
-static int
-ni_do_duid_create(const char *caller, const char *ifname, int argc, char **argv)
+static void
+ni_print_supported_hw_type(void)
 {
-	enum { OPT_HELP = 'h', OPT_HWADDR = 'a',
-	       OPT_IDENTIFIER = 'd', OPT_ENTERPRISE = 'n',
-		   OPT_UUID = 'u', OPT_HWTYPE = 't',
-		   OPT_MACHINEID='m', OPT_DMIPRODUCTID='p'};
-	static struct option	options[] = {
-		{ "help",	no_argument,		NULL,	OPT_HELP	},
-		{ "enumber",	required_argument,		NULL,	OPT_ENTERPRISE	},
-		{ "identifier",	required_argument,		NULL,	OPT_IDENTIFIER	},
-		{ "uuid",	required_argument,		NULL,	OPT_UUID	},
-		{ "machine-id",	no_argument,		NULL,	OPT_MACHINEID	},
-		{ "dmi-product-id",	no_argument,		NULL,	OPT_DMIPRODUCTID	},
-		{ "hwaddr",	required_argument,		NULL,	OPT_HWADDR	},
-		{ "hwtype",	required_argument,		NULL,	OPT_HWTYPE	},
-		{ NULL,		no_argument,		NULL,	0		}
-	};
-	int opt = 0, status = NI_WICKED_RC_USAGE;
+	int i = 0;
+	const ni_intmap_t *hwtype = ni_duid_hwtype_map();
+
+	printf("Supported hwtypes are:\n");
+	while(hwtype && hwtype[i].name) {
+		if (hwtype[i].name)
+			printf("%s\n", hwtype[i++].name);
+	}
+}
+
+
+static int
+ni_do_duid_create(const char *caller, int argc, char **argv)
+{
+	int status = NI_WICKED_RC_USAGE;
 	const char *duid_type = NULL;
 	const char *hwtype = NULL;
 	const char *hwaddr = NULL;
 	const char *enumber = NULL;
+	const char *ifname = NULL;
 	char *identifier = NULL;
-	char *uuid = NULL;
 	char *program = NULL;
-	ni_bool_t machine_id = FALSE, dmi_product_id = FALSE;
 
 	if (ni_string_printf(&program, "%s", caller  ? caller  : "wicked duid"))
 		argv[0] = program;
 
 	optind = 1;
 	duid_type = argv[optind++];
-	while ((opt = getopt_long(argc, argv, "+ha:d:i:m:n:p:u:t:", options, NULL)) != EOF) {
-		switch (opt) {
-		case OPT_HWADDR:
-			hwaddr = optarg;
-			break;
-		case OPT_HWTYPE:
-			if (ni_string_eq(optarg, "help")) {
-#if 0
-				int hwtype;
-				for (hwtype = 0; hwtype < ARPHRD_NONE; ++hwtype) {
-					const char *name = ni_duid_hwtype_to_name(hwtype);
-					if (name)
-						printf("%s\n", name);
-				}
-				goto cleanup;
-#endif
-				int i = 0;
-				const ni_intmap_t *hwtype = ni_duid_hwtype_map();
+	if (ni_string_eq(duid_type, "ll")) {
+		switch(argc) {
+			case 5:
+				hwaddr = argv[--argc];
+				hwtype = argv[--argc];
+				ifname = argv[--argc];
+				break;
+			case 4:
+				hwaddr = argv[--argc];
+				hwtype = argv[--argc];
+				break;
+			default:
+				goto usage;
+		}
 
-				printf("Supported hwtypes are:\n");
-				while(hwtype && hwtype[i].name) {
-					if (hwtype[i].name)
-						printf("%s\n", hwtype[i++].name);
-				}
-				goto cleanup;
-			}
-			hwtype = optarg;
-			break;
-		case OPT_IDENTIFIER:
-			identifier = optarg;
-			break;
-		case OPT_ENTERPRISE:
-			enumber = optarg;
-			break;
-		case OPT_UUID:
-			uuid = optarg;
-			break;
-		case OPT_MACHINEID:
-			machine_id = TRUE;
-			break;
-		case OPT_DMIPRODUCTID:
-			dmi_product_id = TRUE;
-			break;
-		case OPT_HELP:
-			status = NI_WICKED_RC_SUCCESS;
-		default:
-		usage:
-			fprintf(stderr,
-				"\nUsage:\n"
-				"  %s [options]\n"
-				"\n"
-				"Options:\n"
-				"create ll --hwaddr <addr> --hwtype <ether|..>\n"
-				"create llt --hwaddr <addr> --hwtype <ether|..>\n"
-				"create en --enumber <enterprise number> --identifier <data>\n"
-				"create uuid --uuid <uuid>\n"
-				"create uuid --machine-id\n"
-				"create uuid --dmi-product-id\n"
-				"\n", program);
+		if (ni_string_eq(hwtype, "help")) {
+			ni_print_supported_hw_type();
 			goto cleanup;
 		}
-	}
-
-	if (optind != argc) {
-		fprintf(stderr, "%s: invalid arguments\n", program);
-		goto usage;
-	}
-
-	if (ni_string_eq(duid_type, "ll")) {
 		status = ni_do_duid_create_duid_ll(ifname, hwtype, hwaddr);
 	} else
 	if (ni_string_eq(duid_type, "llt")) {
+		switch(argc) {
+			case 5:
+				hwaddr = argv[--argc];
+				hwtype = argv[--argc];
+				ifname = argv[--argc];
+				break;
+			case 4:
+				hwaddr = argv[--argc];
+				hwtype = argv[--argc];
+				break;
+			default:
+				goto usage;
+		}
+
+		if (ni_string_eq(hwtype, "help")) {
+			ni_print_supported_hw_type();
+			goto cleanup;
+		}
 		status = ni_do_duid_create_duid_llt(ifname, hwtype, hwaddr);
 	} else
 	if (ni_string_eq(duid_type, "en")) {
+		switch(argc) {
+			case 5:
+				identifier = argv[--argc];
+				enumber = argv[--argc];
+				ifname = argv[--argc];
+				break;
+			case 4:
+				identifier = argv[--argc];
+				enumber = argv[--argc];
+				break;
+			default:
+				goto usage;
+		}
+
 		status = ni_do_duid_create_duid_en(ifname, enumber, identifier);
 	} else
 	if (ni_string_eq(duid_type, "uuid")) {
-		if (machine_id && dmi_product_id)
-			goto usage;
-
-		if (machine_id)
-			status = ni_do_duid_create_duid_uuid_machine_id(ifname);
-		else if (dmi_product_id)
-			status = ni_do_duid_create_duid_uuid_dmi_product_id(ifname);
-		else
-			status = ni_do_duid_create_duid_uuid(ifname, uuid);
+		status = ni_do_duid_create_duid_uuid(ifname, argv + 1, argc - 1);
 	} else {
 		fprintf(stderr, "Unsupported duid type %s \n", duid_type);
 	}
+	if(status == NI_WICKED_RC_SUCCESS)
+		goto cleanup;
+usage:
+	fprintf(stderr,
+		"\nUsage:\n"
+		"  %s [options]\n"
+		"\n"
+		"Options:\n"
+		"create ll --hwaddr <addr> --hwtype <ether|..>\n"
+		"create llt --hwaddr <addr> --hwtype <ether|..>\n"
+		"create en --enumber <enterprise number> --identifier <data>\n"
+		"wicked duid create uuid [ifname|default] <uuid>\n"
+		"wicked duid create uuid [--machine-id[=FILE] | --dmi-product-id[=FILE] ] [ifname|default]\n"
+		"\n", program);
 
-	if(status != NI_WICKED_RC_SUCCESS)
-		goto usage;
 cleanup:
 	ni_string_free(&program);
 	return status;
@@ -552,7 +544,7 @@ ni_do_duid(const char *caller, int argc, char **argv)
 		status = ni_do_duid_del (command, argc - optind, argv + optind);
 	} else
 	if (ni_string_eq(cmd, "create")) {
-		status = ni_do_duid_create (command, ifname, argc - optind, argv + optind);
+		status = ni_do_duid_create (command, argc - optind, argv + optind);
 	} else {
 		fprintf(stderr, "%s: unsupported command %s\n", program, cmd);
 		goto usage;
