@@ -530,6 +530,50 @@ ni_ethtool_offload_init(ni_ethtool_offload_t *offload)
 	}
 }
 
+static ni_bool_t
+ni_ethtool_set_bool_single_param(const char *ifname, const char *eopt_name,
+				 const char *name, __ni_ioctl_info_t *sflags, int value, int bitmask)
+{
+	if (__ni_ethtool_set_value(ifname, sflags, value) < 0) {
+		ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+				"%s: failed to set ethtool.%s.%s to %u: %m",
+				ifname, eopt_name, name, value);
+		return FALSE;
+	}
+	else {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: applied ethtool.%s.%s = %s", ifname, eopt_name, name,
+				(value & bitmask) ? "set":"unset");
+	}
+
+	return TRUE;
+}
+
+static int
+ni_ethtool_set_bool_param(const char *ifname, __ni_ioctl_info_t *sflags,
+				const char *eopt_name, const char *name,
+				int *curr, int want, int bitmask)
+{
+	if (want == NI_TRISTATE_DEFAULT)
+		return 1;
+
+	if (want == NI_TRISTATE_ENABLE) {
+		if (*curr & bitmask)
+			return 0;
+		*curr |= bitmask;
+	}
+	else {
+		if (!(*curr & bitmask))
+			return 0;
+		*curr &= ~bitmask;
+	}
+
+	if (ni_ethtool_set_bool_single_param(ifname, eopt_name, name, sflags, *curr, bitmask))
+		return 0;
+
+	return 1;
+}
+
 static int
 __ni_ethtool_get_offload(const char *ifname, ni_ethtool_offload_t *offload)
 {
@@ -574,6 +618,8 @@ __ni_ethtool_get_offload(const char *ifname, ni_ethtool_offload_t *offload)
 static int
 __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 {
+	int value = __ni_ethtool_get_value(ifname, &__ethtool_gflags);
+
 	__ni_ioctl_info_t __ethtool_srxcsum = { ETHTOOL_SRXCSUM, "SRXCSUM" };
 	__ni_ioctl_info_t __ethtool_stxcsum = { ETHTOOL_STXCSUM, "STXCSUM" };
 	__ni_ioctl_info_t __ethtool_ssg = { ETHTOOL_SSG, "SSG" };
@@ -593,37 +639,17 @@ __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 	__ni_ethtool_set_tristate(ifname, &__ethtool_sgso, offload->gso);
 	__ni_ethtool_set_tristate(ifname, &__ethtool_sgro, offload->gro);
 
-	if (offload->lro != NI_TRISTATE_DEFAULT) {
-		int value = __ni_ethtool_get_value(ifname, &__ethtool_gflags);
-
-		if (value >= 0) {
-			if (offload->lro == NI_TRISTATE_ENABLE)
-				value |= ETH_FLAG_LRO;
-			else
-				value &= ~ETH_FLAG_LRO;
-
-			if (offload->rxvlan == NI_TRISTATE_ENABLE)
-				value |= ETH_FLAG_RXVLAN;
-			else
-				value &= ~ETH_FLAG_RXVLAN;
-
-			if (offload->txvlan == NI_TRISTATE_ENABLE)
-				value |= ETH_FLAG_TXVLAN;
-			else
-				value &= ~ETH_FLAG_TXVLAN;
-
-			if (offload->ntuple == NI_TRISTATE_ENABLE)
-				value |= ETH_FLAG_NTUPLE;
-			else
-				value &= ~ETH_FLAG_NTUPLE;
-
-			if (offload->rxhash == NI_TRISTATE_ENABLE)
-				value |= ETH_FLAG_RXHASH;
-			else
-				value &= ~ETH_FLAG_RXHASH;
-		}
-
-		__ni_ethtool_set_value(ifname, &__ethtool_sflags, value);
+	if (value >= 0) {
+		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "lro",
+			&value, offload->lro, ETH_FLAG_LRO);
+		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxvlan",
+			&value, offload->rxvlan, ETH_FLAG_RXVLAN);
+		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "txvlan",
+			&value, offload->txvlan, ETH_FLAG_TXVLAN);
+		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "ntuple",
+			&value, offload->ntuple, ETH_FLAG_NTUPLE);
+		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxhash",
+			&value, offload->rxhash, ETH_FLAG_RXHASH);
 	}
 
 	return 0;
