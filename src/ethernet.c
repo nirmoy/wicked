@@ -8,6 +8,7 @@
 #endif
 #include <net/if_arp.h>
 #include <linux/ethtool.h>
+#include <linux/sockios.h>
 #include <errno.h>
 
 #include <wicked/util.h>
@@ -198,6 +199,96 @@ ni_ethernet_wol_options_format(ni_stringbuf_t *buf, unsigned int options, const 
 		return buf->string;
 	}
 	return NULL;
+}
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+struct offload_flag_def {
+	uint32_t index;
+	const char *short_name;
+	const char *long_name;
+	const char *kernel_name;
+};
+static struct offload_flag_def offload_flag_def[] = {
+	{ -1, "rx",     "rx-checksumming",		        "rx-checksum"},
+	{ -1, "tx",     "tx-checksumming",		    	"tx-checksum-*"},
+	{ -1, "sg",     "scatter-gather",		    	"tx-scatter-gather*"},
+	{ -1, "tso",    "tcp-segmentation-offload",	    "tx-tcp*-segmentation"},
+	{ -1, "ufo",    "udp-fragmentation-offload",    "tx-udp-fragmentation"},
+	{ -1, "gso",    "generic-segmentation-offload", "tx-generic-segmentation"},
+	{ -1, "gro",    "generic-receive-offload",	    "rx-gro"},
+	{ -1, "lro",    "large-receive-offload", 		"rx-lro"},
+	{ -1, "rxvlan", "rx-vlan-offload",		    	"rx-vlan-hw-parse"},
+	{ -1, "txvlan", "tx-vlan-offload",		    	"tx-vlan-hw-insert"},
+	{ -1, "ntuple", "ntuple-filters",		    	"rx-ntuple-filter"},
+	{ -1, "rxhash", "receive-hashing",		    	"rx-hashing"}
+};
+
+static int
+ni_ethtool_get_num_feature(const char *ifname)
+{
+	struct {
+		struct ethtool_sset_info hdr;
+		unsigned int buf[1];
+	} sset_info;
+
+	sset_info.hdr.cmd = ETHTOOL_GSSET_INFO;
+	sset_info.hdr.reserved = 0;
+	sset_info.hdr.sset_mask = 1ULL << ETH_SS_FEATURES;
+
+	if (__ni_ethtool(ifname, ETHTOOL_GSSET_INFO, &sset_info) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GSSET_INFO failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GSSET_INFO failed: %m", ifname);
+		return -1;
+	}
+	else {
+		return sset_info.hdr.sset_mask ? sset_info.hdr.data[0] : 0;
+	}
+	
+	return 0;
+}
+
+static struct ethtool_gstrings *
+ni_ethtool_get_feature_strings(const char *ifname)
+{
+	struct ethtool_gstrings *strings;
+	int len = ni_ethtool_get_num_feature(ifname);
+
+	strings = calloc(1, sizeof(*strings) + len * ETH_GSTRING_LEN);
+	strings->cmd = ETHTOOL_GSTRINGS;
+	strings->string_set = ETH_SS_FEATURES;
+	strings->len = len;
+
+	if (__ni_ethtool(ifname, ETHTOOL_GSTRINGS, strings) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GSTRINGS failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GSTRINGS failed: %m", ifname);
+		return NULL;
+	}
+	else {
+		return strings;
+	}
+	
+	return NULL;
+}
+static int
+ni_ethtool_init_offload_index(const char *ifname)
+{
+	int i = 0;
+	struct ethtool_gstrings *strings = ni_ethtool_get_feature_strings(ifname);
+
+	for (i; i < strings->len; i++) {
+		int j = 0;
+		for (j; j < ARRAY_SIZE(offload_flag_def); j++) {
+			if (ni_string_cmp(strings->data+i*ETH_GSTRING_LEN, 
+						offload_flag_def[j].kernel_name) == 0)
+				offload_flag_def[j].index = i;
+		}
+	}
 }
 
 static int
@@ -530,6 +621,59 @@ ni_ethtool_offload_init(ni_ethtool_offload_t *offload)
 	}
 }
 
+static int
+ni_ethtool_get_feature_index(const char *name)
+{
+	unsigned int i;
+	int index = -1;
+
+	for (i; i < ARRAY_SIZE(offload_flag_def); i++) {
+		if (ni_string_cmp(offload_flag_def[i].short_name, name) == 0)
+			index = offload_flag_def[i].index;
+	}
+	return index;
+}
+
+static int
+ni_ethtool_set_feature_ofload(const char *ifname, const char *eopt_name,
+		const char *name, int want)
+{
+
+	int i = 0;
+	int num_feature = ni_ethtool_get_num_feature(ifname);
+	int index = 0;
+	struct ethtool_sfeatures *features;
+
+	if (want == NI_TRISTATE_DEFAULT)
+		return 1;
+	
+	index = ni_ethtool_get_feature_index(name);
+
+	features = malloc(sizeof(*features) + ((num_feature+32U-1)/32U) *
+						sizeof(features->features[0]));
+    memset(features->features, 0,
+			((num_feature+32U-1)/32U) * sizeof(features->features[0]));
+	features->cmd = ETHTOOL_SFEATURES;
+	features->size = (num_feature+32U-1)/32U;
+	features->features[index/32U].requested |= want ? 1<<(index % 32U) :0;
+	features->features[index/32U].valid |= 1<<(index % 32U);
+	if (__ni_ethtool(ifname, ETHTOOL_SFEATURES, features) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_SFEATURES failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_SFEATURES failed: %m", ifname);
+		return -1;
+	}
+	else {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: applied ethtool.%s.%s = %s", ifname, eopt_name, name,
+				(want) ? "set":"unset");
+
+	}
+
+}
+
 static ni_bool_t
 ni_ethtool_set_bool_single_param(const char *ifname, const char *eopt_name,
 				 const char *name, __ni_ioctl_info_t *sflags, int value, int bitmask)
@@ -639,18 +783,33 @@ __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 	__ni_ethtool_set_tristate(ifname, &__ethtool_sgso, offload->gso);
 	__ni_ethtool_set_tristate(ifname, &__ethtool_sgro, offload->gro);
 
-	if (value >= 0) {
+	ni_ethtool_init_offload_index(ifname);
+
+	if (ni_ethtool_get_feature_index("lro") != -1) 
+		ni_ethtool_set_feature_ofload(ifname, "offload", "lro", offload->lro);
+	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "lro",
 			&value, offload->lro, ETH_FLAG_LRO);
+	if (ni_ethtool_get_feature_index("rxvlan") != -1)
+		ni_ethtool_set_feature_ofload(ifname, "offload", "rxvlan", offload->rxvlan);
+	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxvlan",
 			&value, offload->rxvlan, ETH_FLAG_RXVLAN);
+	if (ni_ethtool_get_feature_index("txvlan") != -1)
+		ni_ethtool_set_feature_ofload(ifname, "offload", "txvlan", offload->txvlan);
+	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "txvlan",
 			&value, offload->txvlan, ETH_FLAG_TXVLAN);
+	if (ni_ethtool_get_feature_index("ntuple") != -1)
+		ni_ethtool_set_feature_ofload(ifname, "offload", "ntuple", offload->ntuple);
+	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "ntuple",
 			&value, offload->ntuple, ETH_FLAG_NTUPLE);
+	if (ni_ethtool_get_feature_index("rxhash") != -1)
+		ni_ethtool_set_feature_ofload(ifname, "offload", "rxvlan", offload->rxhash);
+	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxhash",
 			&value, offload->rxhash, ETH_FLAG_RXHASH);
-	}
 
 	return 0;
 }
