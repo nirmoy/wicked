@@ -60,6 +60,28 @@ typedef struct ni_ethtool_offload {
 	ni_tristate_t	txvlan;
 	ni_tristate_t	ntuple;
 	ni_tristate_t	rxhash;
+	ni_tristate_t   highdma;
+	ni_tristate_t   rx_vlan_filter;
+	ni_tristate_t   vlan_challenged;
+	ni_tristate_t   tx_lockles;
+	ni_tristate_t   netns_local;
+	ni_tristate_t   tx_gso_robust;
+	ni_tristate_t   tx_fcoe_segmentation;
+	ni_tristate_t   tx_gre_segmentation;
+	ni_tristate_t   tx_ipip_segmentation;
+	ni_tristate_t   tx_sit_segmentation;
+	ni_tristate_t   tx_udp_tnl_segmentation;
+	ni_tristate_t   fcoe_mtu;
+	ni_tristate_t   tx_nocache_copy;
+	ni_tristate_t   loopback;
+	ni_tristate_t   rx_fcs;
+	ni_tristate_t   rx_all;
+	ni_tristate_t   tx_vlan_stag_hw_insert;
+	ni_tristate_t   rx_vlan_stag_hw_parse;
+	ni_tristate_t   rx_vlan_stag_filter;
+	ni_tristate_t   l2_fwd_offload;
+	ni_tristate_t   busy_poll;
+	ni_tristate_t   hw_tc_offload;
 } ni_ethtool_offload_t;
 
 #define NI_ETHTOOL_EEE_DEFAULT		-1U

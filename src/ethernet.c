@@ -220,7 +220,29 @@ static struct offload_flag_def offload_flag_def[] = {
 	{ -1, "rxvlan", "rx-vlan-offload",		    	"rx-vlan-hw-parse"},
 	{ -1, "txvlan", "tx-vlan-offload",		    	"tx-vlan-hw-insert"},
 	{ -1, "ntuple", "ntuple-filters",		    	"rx-ntuple-filter"},
-	{ -1, "rxhash", "receive-hashing",		    	"rx-hashing"}
+	{ -1, "rxhash", "receive-hashing",		    	"rx-hashing"},
+	{ -1, "highdma",                    "",	        "highdma"},
+	{ -1, "rx-vlan-filter",             "",         "rx-vlan-filter"},
+	{ -1, "vlan-challenged",            "",         "vlan-challenged"},
+	{ -1, "tx-lockless",                "",         "tx-lockless"},
+	{ -1, "netns-local",                "",         "netns-local"},
+	{ -1, "tx-gso-robust",              "",         "tx-gso-robust"},
+	{ -1, "tx-fcoe-segmentation",       "",         "tx-fcoe-segmentation"},
+	{ -1, "tx-gre-segmentation",        "",         "tx-gre-segmentation"},
+	{ -1, "tx-ipip-segmentation",       "",         "tx-ipip-segmentation"},
+	{ -1, "tx-sit-segmentation",        "",         "tx-sit-segmentation"},
+	{ -1, "tx-udp_tnl-segmentation",    "",         "tx-udp_tnl-segmentation"},
+	{ -1, "fcoe-mtu",                   "",         "fcoe-mtu"},
+	{ -1, "tx-nocache-copy",            "",         "tx-nocache-copy"},
+	{ -1, "loopback",                   "",         "loopback"},
+	{ -1, "rx-fcs",                     "",         "rx-fcs"},
+	{ -1, "rx-all",                     "",         "rx-all"},
+	{ -1, "tx-vlan-stag-hw-insert",     "",         "tx-vlan-stag-hw-insert"},
+	{ -1, "rx-vlan-stag-hw-parse",      "",         "rx-vlan-stag-hw-parse"},
+	{ -1, "rx-vlan-stag-filter",        "",         "rx-vlan-stag-filter"},
+	{ -1, "l2-fwd-offload",             "",         "l2-fwd-offload"},
+	{ -1, "busy-poll",                  "",         "busy-poll"},
+	{ -1, "hw-tc-offload",              "",         "hw-tc-offload"},
 };
 
 static int
@@ -647,7 +669,10 @@ ni_ethtool_set_feature_ofload(const char *ifname, const char *eopt_name,
 	if (want == NI_TRISTATE_DEFAULT)
 		return 1;
 	
-	index = ni_ethtool_get_feature_index(name);
+	if ((index = ni_ethtool_get_feature_index(name)) == -1) {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: ethtool.%s.%s is not supprted by driver", ifname, eopt_name, name);
+	}
 
 	features = malloc(sizeof(*features) + ((num_feature+32U-1)/32U) *
 						sizeof(features->features[0]));
@@ -810,6 +835,29 @@ __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxhash",
 			&value, offload->rxhash, ETH_FLAG_RXHASH);
+	/* set all features that have kernel_name == shrot_name */
+	ni_ethtool_set_feature_ofload(ifname, "offload", "highdma", offload->highdma);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-filter", offload->rx_vlan_filter);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "vlan-challenged", offload->vlan_challenged);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-lockless", offload->tx_lockles);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "netns-local", offload->netns_local);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-gso-robust", offload->tx_gso_robust);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-fcoe-segmentation", offload->tx_fcoe_segmentation);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-gre-segmentation", offload->tx_gre_segmentation);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-ipip-segmentation", offload->tx_ipip_segmentation);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-sit-segmentation", offload->tx_sit_segmentation);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-udp_tnl-segmentation", offload->tx_udp_tnl_segmentation);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "fcoe-mtu", offload->fcoe_mtu);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-nocache-copy", offload->tx_nocache_copy);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "loopback", offload->loopback);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-fcs", offload->rx_fcs);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-all", offload->rx_all);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-vlan-stag-hw-insert", offload->tx_vlan_stag_hw_insert);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-stag-hw-parse", offload->rx_vlan_stag_hw_parse);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-stag-filter", offload->rx_vlan_stag_filter);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "l2-fwd-offload", offload->l2_fwd_offload);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "busy-poll", offload->busy_poll);
+	ni_ethtool_set_feature_ofload(ifname, "offload", "hw-tc-offload", offload->hw_tc_offload);
 
 	return 0;
 }
