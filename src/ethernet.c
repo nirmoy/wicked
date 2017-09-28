@@ -203,46 +203,47 @@ ni_ethernet_wol_options_format(ni_stringbuf_t *buf, unsigned int options, const 
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 struct offload_flag_def {
+	ni_tristate_t value;
 	uint32_t index;
 	const char *short_name;
 	const char *long_name;
 	const char *kernel_name;
 };
 static struct offload_flag_def offload_flag_def[] = {
-	{ -1, "rx",     "rx-checksumming",		        "rx-checksum"},
-	{ -1, "tx",     "tx-checksumming",		    	"tx-checksum-*"},
-	{ -1, "sg",     "scatter-gather",		    	"tx-scatter-gather*"},
-	{ -1, "tso",    "tcp-segmentation-offload",	    "tx-tcp*-segmentation"},
-	{ -1, "ufo",    "udp-fragmentation-offload",    "tx-udp-fragmentation"},
-	{ -1, "gso",    "generic-segmentation-offload", "tx-generic-segmentation"},
-	{ -1, "gro",    "generic-receive-offload",	    "rx-gro"},
-	{ -1, "lro",    "large-receive-offload", 		"rx-lro"},
-	{ -1, "rxvlan", "rx-vlan-offload",		    	"rx-vlan-hw-parse"},
-	{ -1, "txvlan", "tx-vlan-offload",		    	"tx-vlan-hw-insert"},
-	{ -1, "ntuple", "ntuple-filters",		    	"rx-ntuple-filter"},
-	{ -1, "rxhash", "receive-hashing",		    	"rx-hashing"},
-	{ -1, "highdma",                    "",	        "highdma"},
-	{ -1, "rx-vlan-filter",             "",         "rx-vlan-filter"},
-	{ -1, "vlan-challenged",            "",         "vlan-challenged"},
-	{ -1, "tx-lockless",                "",         "tx-lockless"},
-	{ -1, "netns-local",                "",         "netns-local"},
-	{ -1, "tx-gso-robust",              "",         "tx-gso-robust"},
-	{ -1, "tx-fcoe-segmentation",       "",         "tx-fcoe-segmentation"},
-	{ -1, "tx-gre-segmentation",        "",         "tx-gre-segmentation"},
-	{ -1, "tx-ipip-segmentation",       "",         "tx-ipip-segmentation"},
-	{ -1, "tx-sit-segmentation",        "",         "tx-sit-segmentation"},
-	{ -1, "tx-udp_tnl-segmentation",    "",         "tx-udp_tnl-segmentation"},
-	{ -1, "fcoe-mtu",                   "",         "fcoe-mtu"},
-	{ -1, "tx-nocache-copy",            "",         "tx-nocache-copy"},
-	{ -1, "loopback",                   "",         "loopback"},
-	{ -1, "rx-fcs",                     "",         "rx-fcs"},
-	{ -1, "rx-all",                     "",         "rx-all"},
-	{ -1, "tx-vlan-stag-hw-insert",     "",         "tx-vlan-stag-hw-insert"},
-	{ -1, "rx-vlan-stag-hw-parse",      "",         "rx-vlan-stag-hw-parse"},
-	{ -1, "rx-vlan-stag-filter",        "",         "rx-vlan-stag-filter"},
-	{ -1, "l2-fwd-offload",             "",         "l2-fwd-offload"},
-	{ -1, "busy-poll",                  "",         "busy-poll"},
-	{ -1, "hw-tc-offload",              "",         "hw-tc-offload"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx",     "rx-checksumming",		        "rx-checksum"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx",     "tx-checksumming",		    	"tx-checksum-*"},
+	{ NI_TRISTATE_DEFAULT, -1, "sg",     "scatter-gather",		    	"tx-scatter-gather*"},
+	{ NI_TRISTATE_DEFAULT, -1, "tso",    "tcp-segmentation-offload",	    "tx-tcp*-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "ufo",    "udp-fragmentation-offload",    "tx-udp-fragmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "gso",    "generic-segmentation-offload", "tx-generic-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "gro",    "generic-receive-offload",	    "rx-gro"},
+	{ NI_TRISTATE_DEFAULT, -1, "lro",    "large-receive-offload", 		"rx-lro"},
+	{ NI_TRISTATE_DEFAULT, -1, "rxvlan", "rx-vlan-offload",		    	"rx-vlan-hw-parse"},
+	{ NI_TRISTATE_DEFAULT, -1, "txvlan", "tx-vlan-offload",		    	"tx-vlan-hw-insert"},
+	{ NI_TRISTATE_DEFAULT, -1, "ntuple", "ntuple-filters",		    	"rx-ntuple-filter"},
+	{ NI_TRISTATE_DEFAULT, -1, "rxhash", "receive-hashing",		    	"rx-hashing"},
+	{ NI_TRISTATE_DEFAULT, -1, "highdma",                    "",	        "highdma"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx-vlan-filter",             "",         "rx-vlan-filter"},
+	{ NI_TRISTATE_DEFAULT, -1, "vlan-challenged",            "",         "vlan-challenged"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-lockless",                "",         "tx-lockless"},
+	{ NI_TRISTATE_DEFAULT, -1, "netns-local",                "",         "netns-local"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-gso-robust",              "",         "tx-gso-robust"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-fcoe-segmentation",       "",         "tx-fcoe-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-gre-segmentation",        "",         "tx-gre-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-ipip-segmentation",       "",         "tx-ipip-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-sit-segmentation",        "",         "tx-sit-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-udp_tnl-segmentation",    "",         "tx-udp_tnl-segmentation"},
+	{ NI_TRISTATE_DEFAULT, -1, "fcoe-mtu",                   "",         "fcoe-mtu"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-nocache-copy",            "",         "tx-nocache-copy"},
+	{ NI_TRISTATE_DEFAULT, -1, "loopback",                   "",         "loopback"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx-fcs",                     "",         "rx-fcs"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx-all",                     "",         "rx-all"},
+	{ NI_TRISTATE_DEFAULT, -1, "tx-vlan-stag-hw-insert",     "",         "tx-vlan-stag-hw-insert"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx-vlan-stag-hw-parse",      "",         "rx-vlan-stag-hw-parse"},
+	{ NI_TRISTATE_DEFAULT, -1, "rx-vlan-stag-filter",        "",         "rx-vlan-stag-filter"},
+	{ NI_TRISTATE_DEFAULT, -1, "l2-fwd-offload",             "",         "l2-fwd-offload"},
+	{ NI_TRISTATE_DEFAULT, -1, "busy-poll",                  "",         "busy-poll"},
+	{ NI_TRISTATE_DEFAULT, -1, "hw-tc-offload",              "",         "hw-tc-offload"},
 };
 
 static int
@@ -640,6 +641,28 @@ ni_ethtool_offload_init(ni_ethtool_offload_t *offload)
 		offload->txvlan		= NI_TRISTATE_DEFAULT;
 		offload->ntuple		= NI_TRISTATE_DEFAULT;
 		offload->rxhash		= NI_TRISTATE_DEFAULT;
+		offload->highdma                 = NI_TRISTATE_DEFAULT;
+		offload->rx_vlan_filter          = NI_TRISTATE_DEFAULT;
+		offload->vlan_challenged         = NI_TRISTATE_DEFAULT;
+		offload->tx_lockles              = NI_TRISTATE_DEFAULT;
+		offload->netns_local             = NI_TRISTATE_DEFAULT;
+		offload->tx_gso_robust           = NI_TRISTATE_DEFAULT;
+		offload->tx_fcoe_segmentation    = NI_TRISTATE_DEFAULT;
+		offload->tx_gre_segmentation     = NI_TRISTATE_DEFAULT;
+		offload->tx_ipip_segmentation    = NI_TRISTATE_DEFAULT;
+		offload->tx_sit_segmentation     = NI_TRISTATE_DEFAULT;
+		offload->tx_udp_tnl_segmentation = NI_TRISTATE_DEFAULT;
+		offload->fcoe_mtu                = NI_TRISTATE_DEFAULT;
+		offload->tx_nocache_copy         = NI_TRISTATE_DEFAULT;
+		offload->loopback                = NI_TRISTATE_DEFAULT;
+		offload->rx_fcs                  = NI_TRISTATE_DEFAULT;
+		offload->rx_all                  = NI_TRISTATE_DEFAULT;
+		offload->tx_vlan_stag_hw_insert  = NI_TRISTATE_DEFAULT;
+		offload->rx_vlan_stag_hw_parse   = NI_TRISTATE_DEFAULT;
+		offload->rx_vlan_stag_filter     = NI_TRISTATE_DEFAULT;
+		offload->l2_fwd_offload          = NI_TRISTATE_DEFAULT;
+		offload->busy_poll               = NI_TRISTATE_DEFAULT;
+		offload->hw_tc_offload           = NI_TRISTATE_DEFAULT;
 	}
 }
 
@@ -657,7 +680,55 @@ ni_ethtool_get_feature_index(const char *name)
 }
 
 static int
-ni_ethtool_set_feature_ofload(const char *ifname, const char *eopt_name,
+ni_ethtool_get_feature_offload(const char *ifname, ni_ethtool_offload_t *offload)
+{
+
+	int i = 0;
+	int num_feature = ni_ethtool_get_num_feature(ifname);
+	int index = 0;
+	struct ethtool_gfeatures *gfeatures;
+
+
+	gfeatures = malloc(sizeof(*gfeatures) + ((num_feature+32U-1)/32U) *
+						sizeof(gfeatures->features[0]));
+    memset(gfeatures->features, 0,
+			((num_feature+32U-1)/32U) * sizeof(gfeatures->features[0]));
+	gfeatures->cmd = ETHTOOL_SFEATURES;
+	gfeatures->size = (num_feature+32U-1)/32U;
+	if (__ni_ethtool(ifname, ETHTOOL_GFEATURES, gfeatures) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_SFEATURES failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_SFEATURES failed: %m", ifname);
+		return -1;
+	}
+
+	for (i = 0; ARRAY_SIZE(offload_flag_def); i++) {
+		if (offload_flag_def[i].index != -1) {
+			int idx = offload_flag_def[i].index;
+			int is_maskable = gfeatures->features[idx/32U].available;
+			int is_active = gfeatures->features[idx/32U].active;
+			is_maskable &= 1<<(idx % 32U);
+			is_active &= 1<<(idx % 32U);
+
+			if (is_maskable)
+				if(is_active)
+					offload_flag_def[i].value = NI_TRISTATE_ENABLE;
+				else
+					offload_flag_def[i].value = NI_TRISTATE_DISABLE;
+			else
+					offload_flag_def[i].value = NI_TRISTATE_DEFAULT;
+			ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+					"%s %s=%s", ifname, offload_flag_def[i].kernel_name,
+					offload_flag_def[i].value ? "yes" : "no");
+
+		}
+	}
+}
+
+static int
+ni_ethtool_set_feature_offload(const char *ifname, const char *eopt_name,
 		const char *name, int want)
 {
 
@@ -697,6 +768,7 @@ ni_ethtool_set_feature_ofload(const char *ifname, const char *eopt_name,
 
 	}
 
+	return 0;
 }
 
 static ni_bool_t
@@ -811,53 +883,53 @@ __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 	ni_ethtool_init_offload_index(ifname);
 
 	if (ni_ethtool_get_feature_index("lro") != -1) 
-		ni_ethtool_set_feature_ofload(ifname, "offload", "lro", offload->lro);
+		ni_ethtool_set_feature_offload(ifname, "offload", "lro", offload->lro);
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "lro",
 			&value, offload->lro, ETH_FLAG_LRO);
 	if (ni_ethtool_get_feature_index("rxvlan") != -1)
-		ni_ethtool_set_feature_ofload(ifname, "offload", "rxvlan", offload->rxvlan);
+		ni_ethtool_set_feature_offload(ifname, "offload", "rxvlan", offload->rxvlan);
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxvlan",
 			&value, offload->rxvlan, ETH_FLAG_RXVLAN);
 	if (ni_ethtool_get_feature_index("txvlan") != -1)
-		ni_ethtool_set_feature_ofload(ifname, "offload", "txvlan", offload->txvlan);
+		ni_ethtool_set_feature_offload(ifname, "offload", "txvlan", offload->txvlan);
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "txvlan",
 			&value, offload->txvlan, ETH_FLAG_TXVLAN);
 	if (ni_ethtool_get_feature_index("ntuple") != -1)
-		ni_ethtool_set_feature_ofload(ifname, "offload", "ntuple", offload->ntuple);
+		ni_ethtool_set_feature_offload(ifname, "offload", "ntuple", offload->ntuple);
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "ntuple",
 			&value, offload->ntuple, ETH_FLAG_NTUPLE);
 	if (ni_ethtool_get_feature_index("rxhash") != -1)
-		ni_ethtool_set_feature_ofload(ifname, "offload", "rxvlan", offload->rxhash);
+		ni_ethtool_set_feature_offload(ifname, "offload", "rxvlan", offload->rxhash);
 	else
 		ni_ethtool_set_bool_param(ifname, &__ethtool_sflags,"offload", "rxhash",
 			&value, offload->rxhash, ETH_FLAG_RXHASH);
 	/* set all features that have kernel_name == shrot_name */
-	ni_ethtool_set_feature_ofload(ifname, "offload", "highdma", offload->highdma);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-filter", offload->rx_vlan_filter);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "vlan-challenged", offload->vlan_challenged);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-lockless", offload->tx_lockles);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "netns-local", offload->netns_local);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-gso-robust", offload->tx_gso_robust);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-fcoe-segmentation", offload->tx_fcoe_segmentation);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-gre-segmentation", offload->tx_gre_segmentation);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-ipip-segmentation", offload->tx_ipip_segmentation);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-sit-segmentation", offload->tx_sit_segmentation);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-udp_tnl-segmentation", offload->tx_udp_tnl_segmentation);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "fcoe-mtu", offload->fcoe_mtu);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-nocache-copy", offload->tx_nocache_copy);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "loopback", offload->loopback);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-fcs", offload->rx_fcs);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-all", offload->rx_all);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "tx-vlan-stag-hw-insert", offload->tx_vlan_stag_hw_insert);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-stag-hw-parse", offload->rx_vlan_stag_hw_parse);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "rx-vlan-stag-filter", offload->rx_vlan_stag_filter);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "l2-fwd-offload", offload->l2_fwd_offload);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "busy-poll", offload->busy_poll);
-	ni_ethtool_set_feature_ofload(ifname, "offload", "hw-tc-offload", offload->hw_tc_offload);
+	ni_ethtool_set_feature_offload(ifname, "offload", "highdma", offload->highdma);
+	ni_ethtool_set_feature_offload(ifname, "offload", "rx-vlan-filter", offload->rx_vlan_filter);
+	ni_ethtool_set_feature_offload(ifname, "offload", "vlan-challenged", offload->vlan_challenged);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-lockless", offload->tx_lockles);
+	ni_ethtool_set_feature_offload(ifname, "offload", "netns-local", offload->netns_local);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-gso-robust", offload->tx_gso_robust);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-fcoe-segmentation", offload->tx_fcoe_segmentation);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-gre-segmentation", offload->tx_gre_segmentation);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-ipip-segmentation", offload->tx_ipip_segmentation);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-sit-segmentation", offload->tx_sit_segmentation);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-udp_tnl-segmentation", offload->tx_udp_tnl_segmentation);
+	ni_ethtool_set_feature_offload(ifname, "offload", "fcoe-mtu", offload->fcoe_mtu);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-nocache-copy", offload->tx_nocache_copy);
+	ni_ethtool_set_feature_offload(ifname, "offload", "loopback", offload->loopback);
+	ni_ethtool_set_feature_offload(ifname, "offload", "rx-fcs", offload->rx_fcs);
+	ni_ethtool_set_feature_offload(ifname, "offload", "rx-all", offload->rx_all);
+	ni_ethtool_set_feature_offload(ifname, "offload", "tx-vlan-stag-hw-insert", offload->tx_vlan_stag_hw_insert);
+	ni_ethtool_set_feature_offload(ifname, "offload", "rx-vlan-stag-hw-parse", offload->rx_vlan_stag_hw_parse);
+	ni_ethtool_set_feature_offload(ifname, "offload", "rx-vlan-stag-filter", offload->rx_vlan_stag_filter);
+	ni_ethtool_set_feature_offload(ifname, "offload", "l2-fwd-offload", offload->l2_fwd_offload);
+	ni_ethtool_set_feature_offload(ifname, "offload", "busy-poll", offload->busy_poll);
+	ni_ethtool_set_feature_offload(ifname, "offload", "hw-tc-offload", offload->hw_tc_offload);
 
 	return 0;
 }
@@ -1438,6 +1510,7 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 {
 	__ni_ethtool_get_wol(ifname, &ether->wol);
 	__ni_ethtool_get_offload(ifname, &ether->offload);
+	ni_ethtool_get_feature_offload(ifname, &ether->offload);
 	__ni_ethtool_get_permanent_address(ifname, &ether->permanent_address);
 	__ni_ethtool_get_gset(ifname, ether);
 	ni_ethtool_get_eee(ifname, &ether->eee);
