@@ -8,6 +8,7 @@
 #endif
 #include <net/if_arp.h>
 #include <linux/ethtool.h>
+#include <limits.h>
 #include <errno.h>
 
 #include <wicked/util.h>
@@ -655,6 +656,351 @@ __ni_ethtool_set_offload(const char *ifname, ni_ethtool_offload_t *offload)
 	return 0;
 }
 
+typedef enum {
+	NI_ETHTOOL_FEATURE_SG,
+	NI_ETHTOOL_FEATURE_IP_CSUM,
+	NI_ETHTOOL_FEATURE_HW_CSUM,
+	NI_ETHTOOL_FEATURE_IPV6_CSUM,
+	NI_ETHTOOL_FEATURE_HIGHDMA,
+	NI_ETHTOOL_FEATURE_FRAGLIST,
+	NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_TX,
+	NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_RX,
+	NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_FILTER,
+	NI_ETHTOOL_FEATURE_HW_VLAN_STAG_TX,
+	NI_ETHTOOL_FEATURE_HW_VLAN_STAG_RX,
+	NI_ETHTOOL_FEATURE_HW_VLAN_STAG_FILTER,
+	NI_ETHTOOL_FEATURE_VLAN_CHALLENGED,
+	NI_ETHTOOL_FEATURE_GSO,
+	NI_ETHTOOL_FEATURE_LLTX,
+	NI_ETHTOOL_FEATURE_NETNS_LOCAL,
+	NI_ETHTOOL_FEATURE_GRO,
+	NI_ETHTOOL_FEATURE_LRO,
+	NI_ETHTOOL_FEATURE_TSO,
+	NI_ETHTOOL_FEATURE_UFO,
+	NI_ETHTOOL_FEATURE_GSO_ROBUST,
+	NI_ETHTOOL_FEATURE_TSO_ECN,
+	NI_ETHTOOL_FEATURE_TSO6,
+	NI_ETHTOOL_FEATURE_FSO,
+	NI_ETHTOOL_FEATURE_GSO_GRE,
+	NI_ETHTOOL_FEATURE_GSO_IPIP,
+	NI_ETHTOOL_FEATURE_GSO_SIT,
+	NI_ETHTOOL_FEATURE_GSO_UDP_TUNNEL,
+	NI_ETHTOOL_FEATURE_FCOE_CRC,
+	NI_ETHTOOL_FEATURE_SCTP_CSUM,
+	NI_ETHTOOL_FEATURE_FCOE_MTU,
+	NI_ETHTOOL_FEATURE_NTUPLE,
+	NI_ETHTOOL_FEATURE_RXHASH,
+	NI_ETHTOOL_FEATURE_RXCSUM,
+	NI_ETHTOOL_FEATURE_NOCACHE_COPY,
+	NI_ETHTOOL_FEATURE_LOOPBACK,
+	NI_ETHTOOL_FEATURE_RXFCS,
+	NI_ETHTOOL_FEATURE_RXALL,
+	NI_ETHTOOL_FEATURE_HW_L2FW_DOFFLOAD,
+	NI_ETHTOOL_FEATURE_BUSY_POLL,
+	NI_ETHTOOL_FEATURE_HW_TC,
+
+	NI_ETHTOOL_FEATURE_UNKNOWN = -1U
+} ni_ethtool_feature_id_t;
+
+static const ni_intmap_t		ni_ethtool_feature_name_map[] = {
+	/*
+	 * mapping id constant to name normalizes to first name of the constant
+	 * we normalize to the kernel name as needed to handle unknown features
+	 */
+	{ "tx-scatter-gather",			NI_ETHTOOL_FEATURE_SG			},
+/*l*/	{ "scatter-gather",			NI_ETHTOOL_FEATURE_SG			},
+/*s*/	{ "sg",					NI_ETHTOOL_FEATURE_SG			},
+	{ "tx-checksum-ipv4",			NI_ETHTOOL_FEATURE_IP_CSUM		},
+	{ "tx-checksum-ip-generic",		NI_ETHTOOL_FEATURE_HW_CSUM		},
+/*l*/	{ "tx-checksumming",			NI_ETHTOOL_FEATURE_HW_CSUM		},
+/*s*/	{ "tx",					NI_ETHTOOL_FEATURE_HW_CSUM		},
+	{ "tx-checksum-ipv6",			NI_ETHTOOL_FEATURE_IPV6_CSUM		},
+	{ "highdma",				NI_ETHTOOL_FEATURE_HIGHDMA		},
+	{ "tx-scatter-gather-fraglist",		NI_ETHTOOL_FEATURE_FRAGLIST		},
+	{ "tx-vlan-hw-insert",			NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_TX	},
+/*l*/	{ "tx-vlan-offload",			NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_TX	},
+/*s*/	{ "txvlan",				NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_TX	},
+	{ "rx-vlan-hw-parse",			NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_RX	},
+/*l*/	{ "rx-vlan-offload",			NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_RX	},
+/*s*/	{ "rxvlan",				NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_RX	},
+	{ "rx-vlan-filter",			NI_ETHTOOL_FEATURE_HW_VLAN_CTAG_FILTER	},
+	{ "tx-vlan-stag-hw-insert",		NI_ETHTOOL_FEATURE_HW_VLAN_STAG_TX	},
+	{ "rx-vlan-stag-hw-parse",		NI_ETHTOOL_FEATURE_HW_VLAN_STAG_RX	},
+	{ "rx-vlan-stag-filter",		NI_ETHTOOL_FEATURE_HW_VLAN_STAG_FILTER	},
+	{ "vlan-challenged",			NI_ETHTOOL_FEATURE_VLAN_CHALLENGED	},
+	{ "tx-generic-segmentation",		NI_ETHTOOL_FEATURE_GSO			},
+/*l*/	{ "generic-segmentation-offload",	NI_ETHTOOL_FEATURE_GSO			},
+/*s*/	{ "gso",				NI_ETHTOOL_FEATURE_GSO			},
+	{ "tx-lockless",			NI_ETHTOOL_FEATURE_LLTX			},
+	{ "netns-local",			NI_ETHTOOL_FEATURE_NETNS_LOCAL		},
+	{ "rx-gro",				NI_ETHTOOL_FEATURE_GRO			},
+/*l*/	{ "generic-receive-offload",		NI_ETHTOOL_FEATURE_GRO			},
+/*s*/	{ "gro",				NI_ETHTOOL_FEATURE_GRO			},
+	{ "rx-lro",				NI_ETHTOOL_FEATURE_LRO			},
+/*l*/	{ "large-receive-offload",		NI_ETHTOOL_FEATURE_LRO			},
+/*s*/	{ "lro",				NI_ETHTOOL_FEATURE_LRO			},
+	{ "tx-tcp-segmentation",		NI_ETHTOOL_FEATURE_TSO			},
+/*l*/	{ "tcp-segmentation-offload",		NI_ETHTOOL_FEATURE_TSO			},
+/*s*/	{ "tso",				NI_ETHTOOL_FEATURE_TSO			},
+	{ "tx-udp-fragmentation",		NI_ETHTOOL_FEATURE_UFO			},
+/*l*/	{ "udp-fragmentation-offload",		NI_ETHTOOL_FEATURE_UFO			},
+/*s*/	{ "ufo",				NI_ETHTOOL_FEATURE_UFO			},
+#if 0	/* to have some unknown features */
+	{ "tx-gso-robust",			NI_ETHTOOL_FEATURE_GSO_ROBUST		},
+	{ "tx-tcp-ecn-segmentation",		NI_ETHTOOL_FEATURE_TSO_ECN		},
+	{ "tx-tcp6-segmentation",		NI_ETHTOOL_FEATURE_TSO6			},
+	{ "tx-fcoe-segmentation",		NI_ETHTOOL_FEATURE_FSO			},
+	{ "tx-gre-segmentation",		NI_ETHTOOL_FEATURE_GSO_GRE		},
+	{ "tx-ipip-segmentation",		NI_ETHTOOL_FEATURE_GSO_IPIP		},
+	{ "tx-sit-segmentation",		NI_ETHTOOL_FEATURE_GSO_SIT		},
+	{ "tx-udp_tnl-segmentation",		NI_ETHTOOL_FEATURE_GSO_UDP_TUNNEL	},
+	{ "tx-checksum-fcoe-crc",		NI_ETHTOOL_FEATURE_FCOE_CRC		},
+	{ "tx-checksum-sctp",			NI_ETHTOOL_FEATURE_SCTP_CSUM		},
+	{ "fcoe-mtu",				NI_ETHTOOL_FEATURE_FCOE_MTU		},
+#endif
+	{ "rx-ntuple-filter",			NI_ETHTOOL_FEATURE_NTUPLE		},
+/*l*/	{ "ntuple-filters",			NI_ETHTOOL_FEATURE_NTUPLE		},
+/*s*/	{ "ntuple",				NI_ETHTOOL_FEATURE_NTUPLE		},
+	{ "rx-hashing",				NI_ETHTOOL_FEATURE_RXHASH		},
+/*l*/	{ "receive-hashing",			NI_ETHTOOL_FEATURE_RXHASH		},
+/*s*/	{ "rxhash",				NI_ETHTOOL_FEATURE_RXHASH		},
+	{ "rx-checksum",			NI_ETHTOOL_FEATURE_RXCSUM		},
+/*l*/	{ "rx-checksumming",			NI_ETHTOOL_FEATURE_RXCSUM		},
+/*s*/	{ "rx",					NI_ETHTOOL_FEATURE_RXCSUM		},
+	{ "tx-nocache-copy",			NI_ETHTOOL_FEATURE_NOCACHE_COPY		},
+	{ "loopback",				NI_ETHTOOL_FEATURE_LOOPBACK		},
+	{ "rx-fcs",				NI_ETHTOOL_FEATURE_RXFCS		},
+	{ "rx-all",				NI_ETHTOOL_FEATURE_RXALL		},
+	{ "l2-fwd-offload",			NI_ETHTOOL_FEATURE_HW_L2FW_DOFFLOAD,	},
+	{ "busy-poll",				NI_ETHTOOL_FEATURE_BUSY_POLL		},
+	{ "hw-tc-offload",			NI_ETHTOOL_FEATURE_HW_TC		},
+
+	{ NULL,					NI_ETHTOOL_FEATURE_UNKNOWN		}
+};
+
+const char *
+ni_ethtool_feature_id_to_name(unsigned int id)
+{
+	return ni_format_uint_mapped(id, ni_ethtool_feature_name_map);
+}
+ni_bool_t
+ni_ethtool_feature_name_to_id(const char *name, unsigned int *id)
+{
+	if (ni_parse_uint_mapped(name, ni_ethtool_feature_name_map, id) == 0)
+		return TRUE;
+	return FALSE;
+}
+
+typedef struct ni_ethtool_feature {
+	ni_ethtool_feature_id_t	id;
+	char *			name;
+	unsigned int		index;
+} ni_ethtool_feature_t;
+
+typedef struct ni_ethtool_feature_array {
+	unsigned int		count;
+	ni_ethtool_feature_t **	data;
+} ni_ethtool_feature_array_t;
+
+#define	NI_ETHTOOL_FEATURE_ARRAY_INIT		{ .count = 0, .data = NULL }
+#define NI_ETHTOOL_FEATURE_ARRAY_CHUNK		32
+
+ni_ethtool_feature_t *
+ni_ethtool_feature_new(const char *name, unsigned int index)
+{
+	ni_ethtool_feature_t *feature;
+
+	/* ensure every feature has a name */
+	if (ni_string_empty(name))
+		return NULL;
+
+	feature = calloc(1, sizeof(*feature));
+	if (!feature)
+		return NULL;
+
+	/* set kernel index (-1U on undef) */
+	feature->index = index;
+
+	/* set id when a known feature...  */
+	if (ni_ethtool_feature_name_to_id(name, &feature->id))
+		return feature;
+
+	/* or store unknown feature name   */
+	feature->id = NI_ETHTOOL_FEATURE_UNKNOWN;
+	if (ni_string_dup(&feature->name, name))
+		return feature;
+
+	free(feature);
+	return NULL;
+}
+
+void
+ni_ethtool_feature_free(ni_ethtool_feature_t *feature)
+{
+	if (feature) {
+		ni_string_free(&feature->name);
+		free(feature);
+	}
+}
+
+const char *
+ni_ethtool_feature_name(ni_ethtool_feature_t *feature)
+{
+	if (feature) {
+		if (feature->id == NI_ETHTOOL_FEATURE_UNKNOWN)
+			return feature->name;
+		return ni_ethtool_feature_id_to_name(feature->id);
+	}
+	return NULL;
+}
+
+void
+ni_ethtool_feature_array_init(ni_ethtool_feature_array_t *array)
+{
+	memset(array, 0, sizeof(*array));
+}
+
+void
+ni_ethtool_feature_array_destroy(ni_ethtool_feature_array_t *array)
+{
+	if (array) {
+		while (array->count--)
+			ni_ethtool_feature_free(array->data[array->count]);
+		free(array->data);
+		ni_ethtool_feature_array_init(array);
+	}
+}
+
+static ni_bool_t
+ni_ethtool_feature_array_realloc(ni_ethtool_feature_array_t *array, unsigned int newsize)
+{
+	ni_ethtool_feature_t **newdata;
+	unsigned int i;
+
+	if (!array || (UINT_MAX - NI_ETHTOOL_FEATURE_ARRAY_CHUNK) <= newsize)
+		return FALSE;
+
+	newsize = (newsize + NI_ETHTOOL_FEATURE_ARRAY_CHUNK);
+	newdata = realloc(array->data, newsize * sizeof(*newdata));
+	if (!newdata)
+		return FALSE;
+
+	array->data = newdata;
+	for (i = array->count; i < newsize; ++i)
+		array->data[i] = NULL;
+	return TRUE;
+}
+
+ni_bool_t
+ni_ethtool_feature_array_append(ni_ethtool_feature_array_t *array, ni_ethtool_feature_t *feature)
+{
+	if (!array || !feature)
+		return FALSE;
+
+	if ((array->count % NI_ETHTOOL_FEATURE_ARRAY_CHUNK) == 0 &&
+	    !ni_ethtool_feature_array_realloc(array, array->count))
+		return FALSE;
+
+	array->data[array->count++] = feature;
+	return TRUE;
+}
+
+uint32_t
+ni_ethtool_get_feature_count(const char *ifname)
+{
+	struct {
+		struct ethtool_sset_info hdr;
+		uint32_t buf[1];
+	} sset_info;
+
+	sset_info.hdr.cmd = ETHTOOL_GSSET_INFO;
+	sset_info.hdr.reserved = 0;
+	sset_info.hdr.sset_mask = 1ULL << ETH_SS_FEATURES;
+	if (__ni_ethtool(ifname, sset_info.hdr.cmd, &sset_info) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GSSET_INFO failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GSSET_INFO failed: %m", ifname);
+	} else
+	if (sset_info.hdr.sset_mask == (1ULL << ETH_SS_FEATURES)) {
+		return sset_info.hdr.data[0];
+	}
+
+	return 0;
+}
+
+static struct ethtool_gstrings *
+ni_ethtool_get_feature_strings(const char *ifname)
+{
+	struct ethtool_gstrings *strings;
+	unsigned int count, i;
+
+	count = ni_ethtool_get_feature_count(ifname);
+	if (!count)
+		return NULL;
+
+	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+			"%s: ethtool.features: %u", ifname, count);
+
+	strings = calloc(1, sizeof(*strings) + count * ETH_GSTRING_LEN);
+	if (!strings) {
+		ni_warn("%s: unable to allocate %u ethtool feature strings", ifname, count);
+		return NULL;
+	}
+
+	strings->cmd = ETHTOOL_GSTRINGS;
+	strings->string_set = ETH_SS_FEATURES;
+	strings->len = count;
+	if (__ni_ethtool(ifname, strings->cmd, strings) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GSTRINGS failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GSTRINGS failed: %m", ifname);
+
+		free(strings);
+		return NULL;
+	}
+
+	/* ensure the feature name strings are null-terminated */
+	for (i = 0; i < strings->len; i++)
+		strings->data[(i + 1) * ETH_GSTRING_LEN - 1] = 0;
+
+	return strings;
+}
+
+static int
+ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
+{
+	ni_ethtool_feature_array_t features = NI_ETHTOOL_FEATURE_ARRAY_INIT;
+	ni_ethtool_feature_t *feature;
+	struct ethtool_gstrings *strings;
+	const char *name;
+	unsigned int i;
+
+	if (!(strings = ni_ethtool_get_feature_strings(ifname)))
+		return -1;
+
+	for (i = 0; i < strings->len; ++i) {
+		name = (const char *)(strings->data + i * ETH_GSTRING_LEN);
+
+		if (!(feature = ni_ethtool_feature_new(name, i)))
+			continue;
+
+		if (!ni_ethtool_feature_array_append(&features, feature))
+			ni_ethtool_feature_free(feature);
+		else
+			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u",
+				ifname, i, ni_ethtool_feature_name(feature),
+				feature->name ? " [unknown]" : "",
+				feature->index, feature->id);
+	}
+
+	ni_ethtool_feature_array_destroy(&features);
+	return 0;
+}
+
 static int
 __ni_ethtool_get_permanent_address(const char *ifname, ni_hwaddr_t *perm_addr)
 {
@@ -1226,6 +1572,8 @@ ni_ethtool_set_channels(const char *ifname, ni_ethtool_channels_t *channels)
 
 	return 0;
 }
+
+
 void
 __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 {
@@ -1237,6 +1585,8 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 	ni_ethtool_get_ring(ifname, &ether->ring);
 	ni_ethtool_get_coalesce(ifname, &ether->coalesce);
 	ni_ethtool_get_channels(ifname, &ether->channels);
+
+	ni_ethtool_get_features(ifname);
 }
 
 /*
