@@ -786,14 +786,29 @@ ni_ethtool_feature_id_to_name(unsigned int id)
 ni_bool_t
 ni_ethtool_feature_name_to_id(const char *name, unsigned int *id)
 {
-	if (ni_parse_uint_mapped(name, ni_ethtool_feature_name_map, id) == 0)
+	return ni_parse_uint_mapped(name, ni_ethtool_feature_name_map, id) == 0;
+}
+ni_bool_t
+ni_ethtool_feature_map_name(const char *name, ni_intmap_t *ret)
+{
+	const ni_intmap_t *map = ni_ethtool_feature_name_map;
+
+	if (!name || !ret || !map)
+		return FALSE;
+
+	for ( ; map->name; ++map) {
+		if (strcasecmp(map->name, name))
+			continue;
+
+		ret->name = map->name;
+		ret->value = map->value;
 		return TRUE;
+	}
 	return FALSE;
 }
 
 typedef struct ni_ethtool_feature {
-	ni_ethtool_feature_id_t	id;
-	char *			name;
+	ni_intmap_t		id;
 	unsigned int		index;
 } ni_ethtool_feature_t;
 
@@ -805,10 +820,22 @@ typedef struct ni_ethtool_feature_array {
 #define	NI_ETHTOOL_FEATURE_ARRAY_INIT		{ .count = 0, .data = NULL }
 #define NI_ETHTOOL_FEATURE_ARRAY_CHUNK		32
 
+void
+ni_ethtool_feature_free(ni_ethtool_feature_t *feature)
+{
+	if (feature) {
+		if (feature->id.value == NI_ETHTOOL_FEATURE_UNKNOWN)
+			free((char *)feature->id.name);
+		feature->id.name = NULL;
+		free(feature);
+	}
+}
+
 ni_ethtool_feature_t *
 ni_ethtool_feature_new(const char *name, unsigned int index)
 {
 	ni_ethtool_feature_t *feature;
+	char *copy = NULL;
 
 	/* ensure every feature has a name */
 	if (ni_string_empty(name))
@@ -822,35 +849,15 @@ ni_ethtool_feature_new(const char *name, unsigned int index)
 	feature->index = index;
 
 	/* set id when a known feature...  */
-	if (ni_ethtool_feature_name_to_id(name, &feature->id))
+	if (ni_ethtool_feature_map_name(name, &feature->id))
 		return feature;
 
 	/* or store unknown feature name   */
-	feature->id = NI_ETHTOOL_FEATURE_UNKNOWN;
-	if (ni_string_dup(&feature->name, name))
+	feature->id.value = NI_ETHTOOL_FEATURE_UNKNOWN;
+	if (ni_string_dup(&copy, name) && (feature->id.name = copy))
 		return feature;
 
-	free(feature);
-	return NULL;
-}
-
-void
-ni_ethtool_feature_free(ni_ethtool_feature_t *feature)
-{
-	if (feature) {
-		ni_string_free(&feature->name);
-		free(feature);
-	}
-}
-
-const char *
-ni_ethtool_feature_name(ni_ethtool_feature_t *feature)
-{
-	if (feature) {
-		if (feature->id == NI_ETHTOOL_FEATURE_UNKNOWN)
-			return feature->name;
-		return ni_ethtool_feature_id_to_name(feature->id);
-	}
+	ni_ethtool_feature_free(feature);
 	return NULL;
 }
 
@@ -992,9 +999,10 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 			ni_ethtool_feature_free(feature);
 		else
 			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u",
-				ifname, i, ni_ethtool_feature_name(feature),
-				feature->name ? " [unknown]" : "",
-				feature->index, feature->id);
+				ifname, i, feature->id.name,
+				feature->id.value == NI_ETHTOOL_FEATURE_UNKNOWN ?
+				" [unknown]" : "",
+				feature->index, feature->id.value);
 	}
 
 	ni_ethtool_feature_array_destroy(&features);
