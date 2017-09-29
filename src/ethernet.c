@@ -807,6 +807,11 @@ ni_ethtool_feature_map_name(const char *name, ni_intmap_t *ret)
 	return FALSE;
 }
 
+enum {
+	NI_ETHTOOL_FEATURE_IS_ON,
+	NI_ETHTOOL_FEATURE_IS_REQUESTED,
+};
+
 typedef struct ni_ethtool_feature {
 	ni_intmap_t		id;
 	unsigned int		index;
@@ -1052,21 +1057,41 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 	for (i = 0; i < gstrings->len; ++i) {
 		struct ethtool_get_features_block *block;
 		const char *name;
+		unsigned int bit;
 
 		name = (const char *)(gstrings->data + i * ETH_GSTRING_LEN);
 		block = &gfeatures->features[i/32];
+		bit = NI_BIT(i % 32U);
+
+		/* don't even store unavailable + unchangeable features */
+#if 1
+		if ((block->never_changed & bit) || !(block->available & bit))
+			continue;
+#endif
 
 		if (!(feature = ni_ethtool_feature_new(name, i)))
 			continue;
 
+		if (block->active & bit)
+			feature->value |= NI_BIT(0);
+		if ((block->requested & bit) ^ (block->active & bit))
+			feature->value |= NI_BIT(1);
+
 		if (!ni_ethtool_feature_array_append(&features, feature))
 			ni_ethtool_feature_free(feature);
 		else
-			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u",
+			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u: value: => %s%s (%s%s%s%s)",
 				ifname, i, feature->id.name,
 				feature->id.value == NI_ETHTOOL_FEATURE_UNKNOWN ?
 				" [unknown]" : "",
-				feature->index, feature->id.value);
+				feature->index, feature->id.value,
+				feature->value & NI_BIT(0) ? "on" : "off",
+				feature->value & NI_BIT(1) ? "requested" : "",
+				block->active & bit ? "on" : "of",
+				block->requested & bit ? " requested" : "",
+				block->available & bit ? " available" : "",
+				block->never_changed & bit ? " unchangable" : ""
+				);
 	}
 
 	ni_ethtool_feature_array_destroy(&features);
