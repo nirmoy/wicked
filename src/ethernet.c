@@ -978,13 +978,15 @@ ni_ethtool_get_feature_strings(const char *ifname)
 	return gstrings;
 }
 
+#define ni_ethtool_get_feature_blocks(n)	(((n) + 31U) / 32U)
+
 static struct ethtool_gfeatures *
 ni_ethtool_get_feature_values(const char *ifname, unsigned int count)
 {
 	struct ethtool_gfeatures *gfeatures;
 	unsigned int blocks;
 
-	blocks = ((count + 31U) / 32U);
+	blocks = ni_ethtool_get_feature_blocks(count);
 	gfeatures = calloc(1, sizeof(*gfeatures) + blocks * sizeof(gfeatures->features[0]));
 	if (!gfeatures)
 		return NULL;
@@ -1010,19 +1012,49 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 	ni_ethtool_feature_t *feature;
 	struct ethtool_gstrings *gstrings;
 	struct ethtool_gfeatures *gfeatures;
-	const char *name;
 	unsigned int i;
+	char * bin(unsigned int n) {
+		unsigned int i, j = 0;
+		static char bins[33] = {0};
+
+		memset(bins, 0, sizeof(bins));
+		for (i = 1 << 31; i > 0; i = i / 2) {
+			(n & i) ? (bins[j] = '1') : (bins[j] = '0');
+			j++;
+		}
+		return bins;
+	}
+
 
 	gstrings = ni_ethtool_get_feature_strings(ifname);
 	if (!gstrings)
 		return -1;
 
 	gfeatures = ni_ethtool_get_feature_values(ifname, gstrings->len);
-	if (!gfeatures)
+	if (!gfeatures) {
+		free(gstrings);
 		return -1;
+	}
+	if (gfeatures->size != ni_ethtool_get_feature_blocks(gstrings->len)) {
+		free(gstrings);
+		free(gfeatures);
+		return -1;
+	}
+	for (i = 0; i < ni_ethtool_get_feature_blocks(gstrings->len); ++i) {
+		struct ethtool_get_features_block *block;
+		block = &gfeatures->features[i];
+		ni_trace("%s: gfeature [%u].available: %s", ifname, i, bin(block->available));
+		ni_trace("%s: gfeature [%u].requested: %s", ifname, i, bin(block->requested));
+		ni_trace("%s: gfeature [%u].active:    %s", ifname, i, bin(block->active));
+		ni_trace("%s: gfeature [%u].unchanged: %s", ifname, i, bin(block->never_changed));
+	}
 
 	for (i = 0; i < gstrings->len; ++i) {
+		struct ethtool_get_features_block *block;
+		const char *name;
+
 		name = (const char *)(gstrings->data + i * ETH_GSTRING_LEN);
+		block = &gfeatures->features[i/32];
 
 		if (!(feature = ni_ethtool_feature_new(name, i)))
 			continue;
