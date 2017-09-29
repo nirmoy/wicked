@@ -26,6 +26,17 @@
     <magic     bit="5"/>
     <secure-on bit="6"/>
   </define>
+  <define name="ethtool-feature-value" type="int32" constraint="enum" extends="tristate">
+    <off              value="0"/>
+    <on               value="1"/>
+    <off-requested    value="2"/>
+    <on-requested     value="3"/>
+    <!--
+    <true             value="1"/>
+    <false            value="0"/>
+    <default          value="-1"/>
+    -->
+  </define>
 
   <define name="configuration" class="dict">
     <address type="ethernet-address"/>
@@ -53,6 +64,8 @@
       <txvlan type="tristate"/>
       <ntuple type="tristate"/>
       <rxhash type="tristate"/>
+      <tx-tcp6-segmentation type="ethtool-feature-value"/>
+      <tx-scatter-gather    type="ethtool-feature-value"/>
     </offload>
 
     <eee class="dict">

@@ -266,7 +266,8 @@ __ni_objectmodel_ethernet_get_offload(const ni_dbus_object_t *object,
 				DBusError *error)
 {
 	const ni_ethernet_t *eth;
-	
+	unsigned int i;
+
 	if (!(eth = __ni_objectmodel_ethernet_read_handle(object, error)))
 		return FALSE;
 
@@ -295,6 +296,18 @@ __ni_objectmodel_ethernet_get_offload(const ni_dbus_object_t *object,
 	if (ni_tristate_is_set(eth->offload.rxhash))
 		ni_dbus_dict_add_int32(result, "rxhash", eth->offload.rxhash);
 
+	for (i = 0; i < eth->features.features.count; ++i) {
+		const ni_ethtool_feature_t *feature;
+
+		if (!(feature = eth->features.features.data[i]))
+			continue;
+
+		if (feature->value == -1U)
+			continue;
+
+		ni_dbus_dict_add_int32(result, feature->id.name, feature->value);
+	}
+
 	return TRUE;
 }
 
@@ -319,13 +332,37 @@ __ni_objectmodel_ethernet_set_offload(ni_dbus_object_t *object,
 				const ni_dbus_variant_t *argument,
 				DBusError *error)
 {
+	const ni_dbus_dict_entry_t *entry;
+	ni_ethtool_feature_t *feature;
 	ni_ethernet_t *eth;
+	unsigned int i;
+	int32_t value;
 
 	if (!(eth = __ni_objectmodel_ethernet_write_handle(object, error)))
 		return FALSE;
 
 	if (!ni_dbus_variant_is_dict(argument))
 		return FALSE;
+
+	eth->features.total = 0;
+	ni_ethtool_feature_array_destroy(&eth->features.features);
+	for (i = 0; i < argument->array.len; ++i) {
+
+		if (!(entry = &argument->dict_array_value[i]))
+			continue;
+
+		ni_dbus_variant_get_int32(&entry->datum, &value);
+		if (value < 0)
+			continue;
+
+		feature = ni_ethtool_feature_new(entry->key, -1U);
+		if (!feature)
+			continue;
+
+		feature->value = (unsigned int)value;
+		if (!ni_ethtool_feature_array_append(&eth->features.features, feature))
+			ni_ethtool_feature_free(feature);
+	}
 
 	__ni_objectmodel_set_tristate(argument, "rx-csum",
 					&eth->offload.rx_csum);

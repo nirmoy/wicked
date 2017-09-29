@@ -137,6 +137,27 @@ typedef struct ni_ethtool_coalesce {
 	unsigned int	tx_frames_high;
 } ni_ethtool_coalesce_t;
 
+enum {
+	NI_ETHTOOL_FEATURE_ON		= NI_BIT(0),
+	NI_ETHTOOL_FEATURE_REQUESTED	= NI_BIT(1),
+};
+
+typedef struct ni_ethtool_feature {
+	ni_intmap_t			id;
+	unsigned int			index;
+	unsigned int			value;
+} ni_ethtool_feature_t;
+
+typedef struct ni_ethtool_feature_array	{
+	unsigned int			count;
+	ni_ethtool_feature_t **		data;
+} ni_ethtool_feature_array_t;
+
+typedef struct ni_ethtool_features {
+	unsigned int			total;
+	ni_ethtool_feature_array_t	features;
+} ni_ethtool_features_t;
+
 struct ni_ethernet {
 	ni_hwaddr_t		permanent_address;
 	unsigned int		link_speed;
@@ -150,6 +171,7 @@ struct ni_ethernet {
 	ni_ethtool_ring_t	ring;
 	ni_ethtool_coalesce_t	coalesce;
 	ni_ethtool_channels_t	channels;
+	ni_ethtool_features_t	features;
 
 	unsigned int		identify_time;
 };
@@ -162,5 +184,12 @@ extern const char *	ni_ethernet_port_type_to_name(ni_ether_port_t);
 extern const char *	ni_ethernet_wol_options_format(ni_stringbuf_t *,
 							unsigned int,
 							const char *);
+
+extern ni_ethtool_feature_t *	ni_ethtool_feature_new(const char *, unsigned int);
+extern void			ni_ethtool_feature_free(ni_ethtool_feature_t *);
+extern void			ni_ethtool_feature_array_init(ni_ethtool_feature_array_t *);
+extern void			ni_ethtool_feature_array_destroy(ni_ethtool_feature_array_t *);
+extern ni_bool_t		ni_ethtool_feature_array_append(ni_ethtool_feature_array_t *,
+								ni_ethtool_feature_t *);
 
 #endif /* __WICKED_ETHERNET_H__ */
