@@ -941,7 +941,7 @@ ni_ethtool_get_feature_count(const char *ifname)
 static struct ethtool_gstrings *
 ni_ethtool_get_feature_strings(const char *ifname)
 {
-	struct ethtool_gstrings *strings;
+	struct ethtool_gstrings *gstrings;
 	unsigned int count, i;
 
 	count = ni_ethtool_get_feature_count(ifname);
@@ -951,31 +951,56 @@ ni_ethtool_get_feature_strings(const char *ifname)
 	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
 			"%s: ethtool.features: %u", ifname, count);
 
-	strings = calloc(1, sizeof(*strings) + count * ETH_GSTRING_LEN);
-	if (!strings) {
-		ni_warn("%s: unable to allocate %u ethtool feature strings", ifname, count);
+	gstrings = calloc(1, sizeof(*gstrings) + count * ETH_GSTRING_LEN);
+	if (!gstrings) {
+		ni_warn("%s: unable to allocate %u ethtool feature gstrings", ifname, count);
 		return NULL;
 	}
 
-	strings->cmd = ETHTOOL_GSTRINGS;
-	strings->string_set = ETH_SS_FEATURES;
-	strings->len = count;
-	if (__ni_ethtool(ifname, strings->cmd, strings) < 0) {
+	gstrings->cmd = ETHTOOL_GSTRINGS;
+	gstrings->string_set = ETH_SS_FEATURES;
+	gstrings->len = count;
+	if (__ni_ethtool(ifname, gstrings->cmd, gstrings) < 0) {
 		if (errno != EOPNOTSUPP && errno != ENODEV)
 			ni_warn("%s: ETHTOOL_GSTRINGS failed: %m", ifname);
 		else
 			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
 					"%s: ETHTOOL_GSTRINGS failed: %m", ifname);
 
-		free(strings);
+		free(gstrings);
 		return NULL;
 	}
 
 	/* ensure the feature name strings are null-terminated */
-	for (i = 0; i < strings->len; i++)
-		strings->data[(i + 1) * ETH_GSTRING_LEN - 1] = 0;
+	for (i = 0; i < gstrings->len; i++)
+		gstrings->data[(i + 1) * ETH_GSTRING_LEN - 1] = 0;
 
-	return strings;
+	return gstrings;
+}
+
+static struct ethtool_gfeatures *
+ni_ethtool_get_feature_values(const char *ifname, unsigned int count)
+{
+	struct ethtool_gfeatures *gfeatures;
+	unsigned int blocks;
+
+	blocks = ((count + 31U) / 32U);
+	gfeatures = calloc(1, sizeof(*gfeatures) + blocks * sizeof(gfeatures->features[0]));
+	if (!gfeatures)
+		return NULL;
+
+	gfeatures->cmd  = ETHTOOL_GFEATURES;
+	gfeatures->size = blocks;
+	if (__ni_ethtool(ifname, gfeatures->cmd, gfeatures) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: ETHTOOL_GFEATURES failed: %m", ifname);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+					"%s: ETHTOOL_GFEATURES failed: %m", ifname);
+		free(gfeatures);
+		return NULL;
+	}
+	return gfeatures;
 }
 
 static int
@@ -983,15 +1008,21 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 {
 	ni_ethtool_feature_array_t features = NI_ETHTOOL_FEATURE_ARRAY_INIT;
 	ni_ethtool_feature_t *feature;
-	struct ethtool_gstrings *strings;
+	struct ethtool_gstrings *gstrings;
+	struct ethtool_gfeatures *gfeatures;
 	const char *name;
 	unsigned int i;
 
-	if (!(strings = ni_ethtool_get_feature_strings(ifname)))
+	gstrings = ni_ethtool_get_feature_strings(ifname);
+	if (!gstrings)
 		return -1;
 
-	for (i = 0; i < strings->len; ++i) {
-		name = (const char *)(strings->data + i * ETH_GSTRING_LEN);
+	gfeatures = ni_ethtool_get_feature_values(ifname, gstrings->len);
+	if (!gfeatures)
+		return -1;
+
+	for (i = 0; i < gstrings->len; ++i) {
+		name = (const char *)(gstrings->data + i * ETH_GSTRING_LEN);
 
 		if (!(feature = ni_ethtool_feature_new(name, i)))
 			continue;
