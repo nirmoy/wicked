@@ -61,6 +61,7 @@ static void	ni_ethtool_eee_init(ni_ethtool_eee_t *);
 static void	ni_ethtool_ring_init(ni_ethtool_ring_t *);
 static void	ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce);
 static void	ni_ethtool_channels_init(ni_ethtool_channels_t *);
+void		ni_ethtool_feature_array_destroy(ni_ethtool_feature_array_t *);
 
 /*
  * Allocate ethernet struct
@@ -87,6 +88,8 @@ ni_ethernet_new(void)
 void
 ni_ethernet_free(ni_ethernet_t *ethernet)
 {
+	if (ethernet)
+		ni_ethtool_feature_array_destroy(&ethernet->features.features);
 	free(ethernet);
 }
 
@@ -778,6 +781,10 @@ static const ni_intmap_t		ni_ethtool_feature_name_map[] = {
 	{ NULL,					NI_ETHTOOL_FEATURE_UNKNOWN		}
 };
 
+#define	NI_ETHTOOL_FEATURE_ARRAY_INIT	{ .count = 0, .data = NULL }
+#define NI_ETHTOOL_FEATURE_ARRAY_CHUNK	32
+
+#if 0
 const char *
 ni_ethtool_feature_id_to_name(unsigned int id)
 {
@@ -788,6 +795,7 @@ ni_ethtool_feature_name_to_id(const char *name, unsigned int *id)
 {
 	return ni_parse_uint_mapped(name, ni_ethtool_feature_name_map, id) == 0;
 }
+#endif
 ni_bool_t
 ni_ethtool_feature_map_name(const char *name, ni_intmap_t *ret)
 {
@@ -806,25 +814,6 @@ ni_ethtool_feature_map_name(const char *name, ni_intmap_t *ret)
 	}
 	return FALSE;
 }
-
-enum {
-	NI_ETHTOOL_FEATURE_IS_ON,
-	NI_ETHTOOL_FEATURE_IS_REQUESTED,
-};
-
-typedef struct ni_ethtool_feature {
-	ni_intmap_t		id;
-	unsigned int		index;
-	unsigned int		value;
-} ni_ethtool_feature_t;
-
-typedef struct ni_ethtool_feature_array {
-	unsigned int		count;
-	ni_ethtool_feature_t **	data;
-} ni_ethtool_feature_array_t;
-
-#define	NI_ETHTOOL_FEATURE_ARRAY_INIT		{ .count = 0, .data = NULL }
-#define NI_ETHTOOL_FEATURE_ARRAY_CHUNK		32
 
 void
 ni_ethtool_feature_free(ni_ethtool_feature_t *feature)
@@ -1011,12 +1000,11 @@ ni_ethtool_get_feature_values(const char *ifname, unsigned int count)
 }
 
 static int
-ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
+ni_ethtool_get_features(const char *ifname, ni_ethtool_features_t *features, ni_bool_t available)
 {
-	ni_ethtool_feature_array_t features = NI_ETHTOOL_FEATURE_ARRAY_INIT;
-	ni_ethtool_feature_t *feature;
-	struct ethtool_gstrings *gstrings;
 	struct ethtool_gfeatures *gfeatures;
+	struct ethtool_gstrings *gstrings;
+	ni_ethtool_feature_t *feature;
 	unsigned int i;
 	char * bin(unsigned int n) {
 		unsigned int i, j = 0;
@@ -1030,10 +1018,13 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 		return bins;
 	}
 
-
 	gstrings = ni_ethtool_get_feature_strings(ifname);
-	if (!gstrings)
+	if (!gstrings) {
 		return -1;
+	}
+
+	features->total = gstrings->len;
+	ni_ethtool_feature_array_destroy(&features->features);
 
 	gfeatures = ni_ethtool_get_feature_values(ifname, gstrings->len);
 	if (!gfeatures) {
@@ -1045,6 +1036,8 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 		free(gfeatures);
 		return -1;
 	}
+
+#if 1
 	for (i = 0; i < ni_ethtool_get_feature_blocks(gstrings->len); ++i) {
 		struct ethtool_get_features_block *block;
 		block = &gfeatures->features[i];
@@ -1053,6 +1046,7 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 		ni_trace("%s: gfeature [%u].active:    %s", ifname, i, bin(block->active));
 		ni_trace("%s: gfeature [%u].unchanged: %s", ifname, i, bin(block->never_changed));
 	}
+#endif
 
 	for (i = 0; i < gstrings->len; ++i) {
 		struct ethtool_get_features_block *block;
@@ -1064,37 +1058,31 @@ ni_ethtool_get_features(const char *ifname/*, ni_ethtool_features_t *...*/)
 		bit = NI_BIT(i % 32U);
 
 		/* don't even store unavailable + unchangeable features */
-#if 1
-		if ((block->never_changed & bit) || !(block->available & bit))
+		if (available && (!(block->available & bit) || (block->never_changed & bit)))
 			continue;
-#endif
 
 		if (!(feature = ni_ethtool_feature_new(name, i)))
 			continue;
 
-		if (block->active & bit)
-			feature->value |= NI_BIT(0);
+		feature->active = !!(block->active & bit);
+		if (!(block->available & bit) || (block->never_changed & bit))
+			feature->fixed = TRUE;
+		else
 		if ((block->requested & bit) ^ (block->active & bit))
-			feature->value |= NI_BIT(1);
+			feature->requested = TRUE;
 
-		if (!ni_ethtool_feature_array_append(&features, feature))
+		if (!ni_ethtool_feature_array_append(&features->features, feature))
 			ni_ethtool_feature_free(feature);
 		else
-			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u: value: => %s%s (%s%s%s%s)",
+			ni_trace("%s: feature[%u]: %s%s, index: %u, id: %u: value: => %s%s",
 				ifname, i, feature->id.name,
 				feature->id.value == NI_ETHTOOL_FEATURE_UNKNOWN ?
 				" [unknown]" : "",
 				feature->index, feature->id.value,
-				feature->value & NI_BIT(0) ? "on" : "off",
-				feature->value & NI_BIT(1) ? "requested" : "",
-				block->active & bit ? "on" : "of",
-				block->requested & bit ? " requested" : "",
-				block->available & bit ? " available" : "",
-				block->never_changed & bit ? " unchangable" : ""
-				);
+				feature->active ? "on" : "off",
+				feature->fixed ? " fixed" :
+				(feature->requested ? " requested" : ""));
 	}
-
-	ni_ethtool_feature_array_destroy(&features);
 	return 0;
 }
 
@@ -1682,8 +1670,7 @@ __ni_system_ethernet_get(const char *ifname, ni_ethernet_t *ether)
 	ni_ethtool_get_ring(ifname, &ether->ring);
 	ni_ethtool_get_coalesce(ifname, &ether->coalesce);
 	ni_ethtool_get_channels(ifname, &ether->channels);
-
-	ni_ethtool_get_features(ifname);
+	ni_ethtool_get_features(ifname, &ether->features, TRUE);
 }
 
 /*

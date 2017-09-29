@@ -137,6 +137,24 @@ typedef struct ni_ethtool_coalesce {
 	unsigned int	tx_frames_high;
 } ni_ethtool_coalesce_t;
 
+typedef struct ni_ethtool_feature {
+	ni_intmap_t			id;
+	unsigned int			index;
+	ni_bool_t			fixed;
+	ni_bool_t			active;
+	ni_bool_t			requested;
+} ni_ethtool_feature_t;
+
+typedef struct ni_ethtool_feature_array	{
+	unsigned int			count;
+	ni_ethtool_feature_t **		data;
+} ni_ethtool_feature_array_t;
+
+typedef struct ni_ethtool_features {
+	unsigned int			total;
+	ni_ethtool_feature_array_t	features;
+} ni_ethtool_features_t;
+
 struct ni_ethernet {
 	ni_hwaddr_t		permanent_address;
 	unsigned int		link_speed;
@@ -150,6 +168,7 @@ struct ni_ethernet {
 	ni_ethtool_ring_t	ring;
 	ni_ethtool_coalesce_t	coalesce;
 	ni_ethtool_channels_t	channels;
+	ni_ethtool_features_t	features;
 
 	unsigned int		identify_time;
 };
