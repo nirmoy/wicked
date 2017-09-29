@@ -810,6 +810,7 @@ ni_ethtool_feature_map_name(const char *name, ni_intmap_t *ret)
 typedef struct ni_ethtool_feature {
 	ni_intmap_t		id;
 	unsigned int		index;
+	unsigned int		value;
 } ni_ethtool_feature_t;
 
 typedef struct ni_ethtool_feature_array {
@@ -837,7 +838,7 @@ ni_ethtool_feature_new(const char *name, unsigned int index)
 	ni_ethtool_feature_t *feature;
 	char *copy = NULL;
 
-	/* ensure every feature has a name */
+	/* ensure every feature has a name   */
 	if (ni_string_empty(name))
 		return NULL;
 
@@ -845,14 +846,14 @@ ni_ethtool_feature_new(const char *name, unsigned int index)
 	if (!feature)
 		return NULL;
 
-	/* set kernel index (-1U on undef) */
+	/* set kernel index (-1U on undef)   */
 	feature->index = index;
 
-	/* set id when a known feature...  */
+	/* set id when it's a known feature  */
 	if (ni_ethtool_feature_map_name(name, &feature->id))
 		return feature;
 
-	/* or store unknown feature name   */
+	/* or deep copy unknown feature name */
 	feature->id.value = NI_ETHTOOL_FEATURE_UNKNOWN;
 	if (ni_string_dup(&copy, name) && (feature->id.name = copy))
 		return feature;
