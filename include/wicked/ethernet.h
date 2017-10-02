@@ -185,4 +185,11 @@ extern const char *	ni_ethernet_wol_options_format(ni_stringbuf_t *,
 							unsigned int,
 							const char *);
 
+extern ni_ethtool_feature_t *	ni_ethtool_feature_new(const char *, unsigned int);
+extern void			ni_ethtool_feature_free(ni_ethtool_feature_t *);
+extern void			ni_ethtool_feature_array_init(ni_ethtool_feature_array_t *);
+extern void			ni_ethtool_feature_array_destroy(ni_ethtool_feature_array_t *);
+extern ni_bool_t		ni_ethtool_feature_array_append(ni_ethtool_feature_array_t *,
+								ni_ethtool_feature_t *);
+
 #endif /* __WICKED_ETHERNET_H__ */
