@@ -137,12 +137,15 @@ typedef struct ni_ethtool_coalesce {
 	unsigned int	tx_frames_high;
 } ni_ethtool_coalesce_t;
 
+enum {
+	NI_ETHTOOL_FEATURE_ON		= NI_BIT(0),
+	NI_ETHTOOL_FEATURE_REQUESTED	= NI_BIT(1),
+};
+
 typedef struct ni_ethtool_feature {
 	ni_intmap_t			id;
 	unsigned int			index;
-	ni_bool_t			fixed;
-	ni_bool_t			active;
-	ni_bool_t			requested;
+	unsigned int			value;
 } ni_ethtool_feature_t;
 
 typedef struct ni_ethtool_feature_array	{
