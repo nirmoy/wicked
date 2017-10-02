@@ -1040,6 +1040,7 @@ ni_ethtool_get_features_init(const char *ifname, ni_ethtool_features_t *features
 	unsigned int i;
 
 	features->total = ni_ethtool_get_feature_count(ifname);
+	ni_ethtool_feature_array_destroy(&features->features);
 	if (features->total == 0 || features->total == -1U)
 		return -1;
 
@@ -1057,7 +1058,6 @@ ni_ethtool_get_features_init(const char *ifname, ni_ethtool_features_t *features
 	}
 
 	features->total = gstrings->len;
-	ni_ethtool_feature_array_destroy(&features->features);
 
 	for (i = 0; i < features->total; ++i) {
 		struct ethtool_get_features_block *block;
