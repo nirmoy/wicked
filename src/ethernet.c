@@ -1162,6 +1162,58 @@ ni_ethtool_get_features(const char *ifname, ni_ethtool_features_t *features)
 }
 
 static int
+ni_ethtool_set_features(const char *ifname, const char *feature_name, ni_tristate_t value)
+{
+
+	unsigned int blocks, i, bit;
+	ni_ethtool_features_t gfeatures = {0};
+	struct ethtool_sfeatures *sfeatures;
+	ni_ethtool_feature_t *feature;
+
+	if (value == NI_TRISTATE_DEFAULT)
+		return -1;;
+
+	ni_ethtool_get_features(ifname, &gfeatures);
+
+	for(i = 0; i < gfeatures.features.count; i++) {
+		feature = gfeatures.features.data[i];
+		if (strcasecmp(feature->id.name, feature_name))
+			continue;
+
+		if(feature->value == NI_ETHTOOL_FEATURE_ON && 
+				value == NI_TRISTATE_ENABLE)
+			continue;
+
+		if(!feature->value && value == NI_TRISTATE_DISABLE)
+			continue;
+
+		blocks = ni_ethtool_get_feature_blocks(gfeatures.total);
+		sfeatures = calloc(1, sizeof(*sfeatures) + blocks * sizeof(sfeatures->features[0]));
+		if (!sfeatures)
+			return -1;
+
+		bit = NI_BIT(feature->index % 32U);
+		sfeatures->cmd  = ETHTOOL_SFEATURES;
+		sfeatures->size = blocks;
+		sfeatures->features[feature->index/32U].requested |= bit;
+		sfeatures->features[feature->index/32U].valid |= bit;
+		if (__ni_ethtool(ifname, sfeatures->cmd, sfeatures) < 0) {
+			if (errno != EOPNOTSUPP && errno != ENODEV)
+				ni_warn("%s: ETHTOOL_SFEATURES failed: %m", ifname);
+			else
+				ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+						"%s: ETHTOOL_SFEATURES failed: %m", ifname);
+			free(sfeatures);
+			return -1;
+		}
+
+		return 0;
+	}
+
+	return -1;
+}
+
+static int
 __ni_ethtool_get_permanent_address(const char *ifname, ni_hwaddr_t *perm_addr)
 {
 	struct {
