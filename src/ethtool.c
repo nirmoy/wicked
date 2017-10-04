@@ -180,17 +180,19 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 
 	memset(&param, 0, sizeof(param));
 	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param) < 0) {
+#if 0
 		if (errno != EOPNOTSUPP)
 			ethtool->unsupported |= NI_ETHTOOL_SKIP_PAUSE;
 		return -1;
+#endif
 	}
 
 	if (!(pause = ni_ethtool_pause_new()))
 		return -1;
 
-	ni_trace("%s: pauseparam.autoneg: %u", ifname, param.autoneg);
-	ni_trace("%s: pauseparam.rx: %u",      ifname, param.rx_pause);
-	ni_trace("%s: pauseparam.tx: %u",      ifname, param.tx_pause);
+	ni_trace("%s: get pause param.autoneg: %u", ifname, param.autoneg);
+	ni_trace("%s: get pause param.rx: %u",      ifname, param.rx_pause);
+	ni_trace("%s: get pause param.tx: %u",      ifname, param.tx_pause);
 
 	ni_tristate_set(&pause->autoneg, param.autoneg);
 	ni_tristate_set(&pause->rx,      param.rx_pause);
@@ -206,16 +208,22 @@ ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_e
 	struct ethtool_pauseparam param;
 	ni_ethtool_pause_t *cur;
 
-	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE || !cfg)
+	ni_trace("%s(%s)", __func__, ifname);
+
+	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE)
 		return -1;
 
-	if (!(cur = ethtool->pause))
+	if (!cfg || !(cur = ethtool->pause))
 		return -1;
 
 	memset(&param, 0, sizeof(param));
 	param.autoneg  = ni_tristate_is_set(cfg->autoneg) ? cfg->autoneg : cur->autoneg;
 	param.rx_pause = ni_tristate_is_set(cfg->rx)      ? cfg->rx      : cur->rx;
 	param.tx_pause = ni_tristate_is_set(cfg->tx)      ? cfg->tx      : cur->tx;
+
+	ni_trace("%s: set pause param.autoneg: %u", ifname, param.autoneg);
+	ni_trace("%s: set pause param.rx: %u",      ifname, param.rx_pause);
+	ni_trace("%s: set pause param.tx: %u",      ifname, param.tx_pause);
 
 	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0)
 		return -1;
