@@ -36,7 +36,8 @@
 #include "kernel.h"
 
 enum {
-	NI_ETHTOOL_SKIP_DRIVER_INFO = NI_BIT(0),
+	NI_ETHTOOL_SKIP_DRIVER_INFO	= NI_BIT(0),
+	NI_ETHTOOL_SKIP_PAUSE		= NI_BIT(1),
 };
 
 /*
@@ -47,7 +48,9 @@ typedef struct ni_ethtool_cmd_info {
 	const char *	name;
 } ni_ethtool_cmd_info_t;
 
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO = { ETHTOOL_GDRVINFO, "GDRVINFO" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO	= { ETHTOOL_GDRVINFO,    "GDRVINFO" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM	= { ETHTOOL_GPAUSEPARAM, "GPAUSEPARAM" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SPAUSEPARAM	= { ETHTOOL_SPAUSEPARAM, "SPAUSEPARAM" };
 
 static int
 ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
@@ -142,6 +145,62 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 }
 
 /*
+ * pause (GPAUSEPARAM,SPAUSEPARAM)
+ */
+void
+ni_ethtool_pause_free(ni_ethtool_pause_t *pause)
+{
+	free(pause);
+}
+
+ni_ethtool_pause_t *
+ni_ethtool_pause_new(void)
+{
+	ni_ethtool_pause_t *pause;
+
+	if ((pause = calloc(1, sizeof(*pause)))) {
+		pause->autoneg = NI_TRISTATE_DEFAULT;
+		pause->rx      = NI_TRISTATE_DEFAULT;
+		pause->tx      = NI_TRISTATE_DEFAULT;
+	}
+	return pause;
+}
+
+static int
+ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
+{
+	struct ethtool_pauseparam param;
+	ni_ethtool_pause_t *pause;
+
+	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE)
+		return -1;
+
+	ni_ethtool_pause_free(ethtool->pause);
+	ethtool->pause = NULL;
+
+	memset(&param, 0, sizeof(param));
+	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param) < 0) {
+		if (errno != EOPNOTSUPP)
+			ethtool->unsupported |= NI_ETHTOOL_SKIP_PAUSE;
+		return -1;
+	}
+
+	if (!(pause = ni_ethtool_pause_new()))
+		return -1;
+
+	ni_trace("%s: pauseparam.autoneg: %u", ifname, param.autoneg);
+	ni_trace("%s: pauseparam.rx: %u",      ifname, param.rx_pause);
+	ni_trace("%s: pauseparam.tx: %u",      ifname, param.tx_pause);
+
+	ni_tristate_set(&pause->autoneg, param.autoneg);
+	ni_tristate_set(&pause->rx,      param.rx_pause);
+	ni_tristate_set(&pause->tx,      param.tx_pause);
+
+	ethtool->pause = pause;
+	return 0;
+}
+
+/*
  * (ni_system_)ethtool refresh
  */
 ni_bool_t
@@ -161,6 +220,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ethtool->unsupported = dev->ethtool ? dev->ethtool->unsupported : 0U;
 
 	apply = ni_ethtool_get_driver_info(dev->name, ethtool) == 0 || apply;
+	apply = ni_ethtool_get_pause(dev->name, ethtool) == 0 || apply;
 
 	if (apply) {
 		ni_netdev_set_ethtool(dev, ethtool);

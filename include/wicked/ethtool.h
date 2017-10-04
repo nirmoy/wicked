@@ -42,7 +42,9 @@ typedef struct ni_ethtool_driver_info {
 } ni_ethtool_driver_info_t;
 
 typedef struct ni_ethtool_pause {
-	unsigned int dummy;
+	ni_tristate_t			autoneg;
+	ni_tristate_t			rx;
+	ni_tristate_t			tx;
 } ni_ethtool_pause_t;
 
 struct ni_ethtool {
@@ -58,5 +60,8 @@ extern ni_bool_t			ni_ethtool_refresh(ni_netdev_t *);
 
 extern ni_ethtool_driver_info_t *	ni_ethtool_driver_info_new(void);
 extern void				ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *);
+
+extern ni_ethtool_pause_t *		ni_ethtool_pause_new(void);
+extern void				ni_ethtool_pause_free(ni_ethtool_pause_t *);
 
 #endif /* WICKED_ETHTOOL_H */

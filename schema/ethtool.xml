@@ -4,6 +4,11 @@
 <service name="ethtool" interface="org.opensuse.Network.Ethtool" object-class="netif">
 
   <define name="configuration" class="dict">
+    <pause class="dict">
+      <autoneg               type="tristate"/>
+      <rx                    type="tristate"/>
+      <tx                    type="tristate"/>
+    </pause>
   </define>
 
   <define name="properties" class="dict" extends="ethtool:configuration">

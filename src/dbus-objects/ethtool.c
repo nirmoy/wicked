@@ -174,6 +174,65 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 }
 
 /*
+ * get/set ethtool.pause properties
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_get_pause(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	const ni_ethtool_pause_t *pause;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (!(pause = ethtool->pause))
+		return FALSE;
+
+	if (ni_tristate_is_set(pause->autoneg))
+		ni_dbus_dict_add_bool(result, "autoneg", pause->autoneg);
+	if (ni_tristate_is_set(pause->rx))
+		ni_dbus_dict_add_bool(result, "rx",      pause->rx);
+	if (ni_tristate_is_set(pause->tx))
+		ni_dbus_dict_add_bool(result, "tx",      pause->tx);
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_pause_t *pause;
+	ni_ethtool_t *ethtool;
+	dbus_bool_t bv;
+
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	ni_ethtool_pause_free(ethtool->pause);
+	if (!(ethtool->pause = ni_ethtool_pause_new()))
+		return FALSE;
+
+	pause = ethtool->pause;
+	if (ni_dbus_dict_get_bool(argument, "autoneg", &bv))
+		ni_tristate_set(&pause->autoneg, bv);
+	if (ni_dbus_dict_get_bool(argument, "rx", &bv))
+		ni_tristate_set(&pause->rx, bv);
+	if (ni_dbus_dict_get_bool(argument, "tx", &bv))
+		ni_tristate_set(&pause->tx, bv);
+
+	return TRUE;
+}
+
+/*
  * ethtool service properties
  */
 #define ETHTOOL_DICT_PROPERTY(type, dbus_name, fstem_name, rw) \
@@ -181,6 +240,7 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 			fstem_name, ni_objectmodel_##type, rw)
 static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
 	ETHTOOL_DICT_PROPERTY(ethtool, driver-info, driver_info, RO),
+	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
 	{ NULL }
 };
 
