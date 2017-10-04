@@ -56,7 +56,10 @@ struct ni_ethtool {
 
 extern ni_ethtool_t *			ni_ethtool_new(void);
 extern void				ni_ethtool_free(ni_ethtool_t *);
+
+/* TODO -> ni_system_ethtool_refresh/setup */
 extern ni_bool_t			ni_ethtool_refresh(ni_netdev_t *);
+extern int				ni_ethtool_setup(ni_netdev_t *, const ni_ethtool_t *);
 
 extern ni_ethtool_driver_info_t *	ni_ethtool_driver_info_new(void);
 extern void				ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *);

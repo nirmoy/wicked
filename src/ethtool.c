@@ -200,6 +200,29 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 	return 0;
 }
 
+static int
+ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_ethtool_pause_t *cfg)
+{
+	struct ethtool_pauseparam param;
+	ni_ethtool_pause_t *cur;
+
+	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE || !cfg)
+		return -1;
+
+	if (!(cur = ethtool->pause))
+		return -1;
+
+	memset(&param, 0, sizeof(param));
+	param.autoneg  = ni_tristate_is_set(cfg->autoneg) ? cfg->autoneg : cur->autoneg;
+	param.rx_pause = ni_tristate_is_set(cfg->rx)      ? cfg->rx      : cur->rx;
+	param.tx_pause = ni_tristate_is_set(cfg->tx)      ? cfg->tx      : cur->tx;
+
+	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0)
+		return -1;
+
+	return 0;
+}
+
 /*
  * (ni_system_)ethtool refresh
  */
@@ -211,7 +234,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 
 	ni_trace("%s(%s,%u)", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 
-	if (!ni_netdev_device_is_ready(dev))
+	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex)
 		return apply;
 
 	if (!(ethtool = ni_ethtool_new()))
@@ -229,6 +252,20 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 		ni_ethtool_free(ethtool);
 	}
 	return apply;
+}
+
+int
+ni_ethtool_setup(ni_netdev_t *dev, const ni_ethtool_t *cfg)
+{
+	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex || !cfg)
+		return -1;
+
+	if (!dev->ethtool || !ni_ethtool_refresh(dev))
+		return -1;
+
+	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->pause);
+
+	return 0;
 }
 
 /*

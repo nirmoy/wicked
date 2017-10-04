@@ -34,6 +34,53 @@
 #include "debug.h"
 
 /*
+ * Extract ethtool properties from a dbug dict argument.
+ * We're re-using device properties from ni_objectmodel_ethernet_service which
+ * extend / are derived from changeDevice method propeties aka configuration.
+ */
+static ni_netdev_t *
+ni_objectmodel_ethtool_request_arg(const ni_dbus_variant_t *argument)
+{
+        if (!ni_dbus_variant_is_dict(argument))
+		return NULL;
+
+	return ni_objectmodel_get_netif_argument(argument, NI_IFTYPE_UNKNOWN,
+						&ni_objectmodel_ethernet_service);
+}
+
+/*
+ * ethtool.changeDevice method
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_setup(ni_dbus_object_t *object, const ni_dbus_method_t *method,
+		unsigned int argc, const ni_dbus_variant_t *argv,
+		ni_dbus_message_t *reply, DBusError *error)
+{
+	ni_netdev_t *dev, *cfg;
+
+	/* we've already checked that argv matches our signature */
+	ni_assert(argc == 1);
+
+	if (!(dev = ni_objectmodel_unwrap_netif(object, error)))
+		return FALSE;
+
+	if (!(cfg = ni_objectmodel_ethtool_request_arg(&argv[0]))) {
+		ni_dbus_error_invalid_args(error, object->path, method->name);
+		return FALSE;
+	}
+
+	if (ni_ethtool_setup(dev, cfg->ethtool) < 0)  {
+		dbus_set_error(error, DBUS_ERROR_FAILED, "failed to apply ethtool settings");
+		ni_netdev_put(cfg);
+		return FALSE;
+	}
+
+	ni_netdev_put(cfg);
+	return TRUE;
+}
+
+
+/*
  * retrieve an ethtool handle from dbus netif object
  */
 static ni_ethtool_t *
@@ -232,6 +279,7 @@ ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
 	return TRUE;
 }
 
+
 /*
  * ethtool service properties
  */
@@ -248,11 +296,12 @@ static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
  * ethtool service methods
  */
 static const ni_dbus_method_t		ni_objectmodel_ethtool_methods[] = {
+	{ "changeDevice",		"a{sv}",	ni_objectmodel_ethtool_setup },
 	{ NULL }
 };
 
 /*
- * ethtool service definition
+ * ethtool service definitions
  */
 ni_dbus_service_t			ni_objectmodel_ethtool_service = {
 	.name				= NI_OBJECTMODEL_ETHTOOL_INTERFACE,
