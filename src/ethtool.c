@@ -39,15 +39,18 @@ enum {
 	NI_ETHTOOL_SKIP_DRIVER_INFO = NI_BIT(0),
 };
 
-typedef struct ni_ioctl_info {
+/*
+ * ethtool cmd error logging utilities
+ */
+typedef struct ni_ethtool_cmd_info {
 	int		cmd;
 	const char *	name;
-} ni_ioctl_info_t;
+} ni_ethtool_cmd_info_t;
 
-static const ni_ioctl_info_t NI_ETHTOOL_CMD_GDRVINFO = { ETHTOOL_GDRVINFO, "GDRVINFO" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO = { ETHTOOL_GDRVINFO, "GDRVINFO" };
 
 static int
-ni_ethtool_call(const char *ifname, const ni_ioctl_info_t *ioc, void *evp)
+ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
 {
 	int ret, err;
 
@@ -63,6 +66,9 @@ ni_ethtool_call(const char *ifname, const ni_ioctl_info_t *ioc, void *evp)
 	return ret;
 }
 
+/*
+ * driver-info (GDRVINFO)
+ */
 void
 ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *info)
 {
@@ -135,6 +141,9 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	return 0;
 }
 
+/*
+ * (ni_system_)ethtool refresh
+ */
 ni_bool_t
 ni_ethtool_refresh(ni_netdev_t *dev)
 {
@@ -162,6 +171,9 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	return apply;
 }
 
+/*
+ * main netdev ethtool struct get/set
+ */
 void
 ni_ethtool_free(ni_ethtool_t *ethtool)
 {
@@ -169,11 +181,6 @@ ni_ethtool_free(ni_ethtool_t *ethtool)
 		ni_ethtool_driver_info_free(ethtool->driver_info);
 		free(ethtool);
 	}
-}
-
-static inline void
-ni_ethtool_init(ni_ethtool_t *ethtool)
-{
 }
 
 ni_ethtool_t *
@@ -186,9 +193,6 @@ ni_ethtool_new(void)
 	return ethtool;
 }
 
-/*
- * netdev ethtool get/set
- */
 ni_ethtool_t *
 ni_netdev_get_ethtool(ni_netdev_t *dev)
 {
