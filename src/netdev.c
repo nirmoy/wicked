@@ -133,6 +133,7 @@ ni_netdev_free(ni_netdev_t *dev)
 	ni_netdev_set_auto6(dev, NULL);
 
 	ni_netdev_set_pci(dev, NULL);
+	ni_netdev_set_ethtool(dev, NULL);
 	ni_netdev_clear_event_filters(dev);
 
 	ni_addrconf_lease_list_destroy(&dev->leases);
