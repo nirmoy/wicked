@@ -49,7 +49,7 @@ ni_netdev_new(const char *name, unsigned int index)
 {
 	ni_netdev_t *dev;
 
-	dev = calloc(1, sizeof(*dev) * 2);
+	dev = calloc(1, sizeof(*dev));
 	if (!dev)
 		return NULL;
 
