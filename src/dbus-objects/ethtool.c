@@ -35,8 +35,8 @@
 
 /*
  * Extract ethtool properties from a dbug dict argument.
- * We're re-using device properties from ni_objectmodel_ethernet_service which
- * extend / are derived from changeDevice method propeties aka configuration.
+ * We're re-using device properties from ni_objectmodel_ethtool_service,
+ * which are derived from changeDevice method configuration propeties.
  */
 static ni_netdev_t *
 ni_objectmodel_ethtool_request_arg(const ni_dbus_variant_t *argument)
@@ -45,7 +45,7 @@ ni_objectmodel_ethtool_request_arg(const ni_dbus_variant_t *argument)
 		return NULL;
 
 	return ni_objectmodel_get_netif_argument(argument, NI_IFTYPE_UNKNOWN,
-						&ni_objectmodel_ethernet_service);
+						&ni_objectmodel_ethtool_service);
 }
 
 /*
