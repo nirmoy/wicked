@@ -28,6 +28,7 @@
 #include <wicked/netinfo.h>
 #include <wicked/logging.h>
 #include <wicked/ethtool.h>
+#include <wicked/system.h>
 #include <wicked/dbus-errors.h>
 #include <wicked/dbus-service.h>
 #include "model.h"
@@ -69,7 +70,7 @@ ni_objectmodel_ethtool_setup(ni_dbus_object_t *object, const ni_dbus_method_t *m
 		return FALSE;
 	}
 
-	if (ni_ethtool_setup(dev, cfg->ethtool) < 0)  {
+	if (ni_system_ethtool_setup(NULL, dev, cfg) < 0)  {
 		dbus_set_error(error, DBUS_ERROR_FAILED, "failed to apply ethtool settings");
 		ni_netdev_put(cfg);
 		return FALSE;
@@ -92,14 +93,8 @@ ni_objectmodel_ethtool_handle(const ni_dbus_object_t *object,
 	if (!(dev = ni_objectmodel_unwrap_netif(object, error)))
 		return NULL;
 
-	ni_trace("%s(%s,%u,%s)", __func__, dev->name, dev->link.ifindex,
-			ni_format_boolean(write_access));
-
-	if (!write_access) {
-		if (dev->link.ifindex)
-			ni_ethtool_refresh(dev);
+	if (!write_access)
 		return dev->ethtool;
-	}
 
 	return ni_netdev_get_ethtool(dev);
 }

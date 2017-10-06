@@ -221,9 +221,12 @@ ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_e
 	param.rx_pause = ni_tristate_is_set(cfg->rx)      ? cfg->rx      : cur->rx;
 	param.tx_pause = ni_tristate_is_set(cfg->tx)      ? cfg->tx      : cur->tx;
 
-	ni_trace("%s: set pause (%u) param.autoneg: %u", ifname, cfg->autoneg, param.autoneg);
-	ni_trace("%s: set pause (%u) param.rx: %u",      ifname, cfg->autoneg, param.rx_pause);
-	ni_trace("%s: set pause (%u) param.tx: %u",      ifname, cfg->autoneg, param.tx_pause);
+	ni_trace("%s: set pause (%d => %d) param.autoneg: %u",
+			ifname, cur->autoneg, cfg->autoneg, param.autoneg);
+	ni_trace("%s: set pause (%d => %d) param.rx: %u",
+			ifname, cur->rx,      cfg->rx,      param.rx_pause);
+	ni_trace("%s: set pause (%d => %d) param.tx: %u",
+			ifname, cur->tx,      cfg->tx,      param.tx_pause);
 
 	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0)
 		return -1;
@@ -232,7 +235,7 @@ ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_e
 }
 
 /*
- * (ni_system_)ethtool refresh
+ * main system refresh and setup functions
  */
 ni_bool_t
 ni_ethtool_refresh(ni_netdev_t *dev)
@@ -242,11 +245,8 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 
 	ni_trace("%s(%s,%u)", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 
-	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex)
-		return apply;
-
 	if (!(ethtool = ni_ethtool_new()))
-		return apply;
+		return FALSE;
 
 	ethtool->unsupported = dev->ethtool ? dev->ethtool->unsupported : 0U;
 
@@ -262,30 +262,40 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	return apply;
 }
 
+void
+ni_system_ethtool_refresh(ni_netdev_t *dev)
+{
+	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex)
+		return;
+
+	ni_ethtool_refresh(dev);
+}
+
 int
-ni_ethtool_setup(ni_netdev_t *dev, const ni_ethtool_t *cfg)
+ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t *cfg)
 {
 	ni_trace("%s(%s,%u)", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 
-	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex || !cfg) {
+	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex || !cfg || !cfg->ethtool) {
 		ni_trace("%s(%s,%u) not ready or invalid args",
 				__func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 		return -1;
 	}
 
-	if (!dev->ethtool || !ni_ethtool_refresh(dev)) {
+	ni_ethtool_refresh(dev);
+	if (!dev->ethtool) {
 		ni_trace("%s(%s,%u) no ethtool or refresh failed",
 				__func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 		return -1;
 	}
 
-	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->pause);
+	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->ethtool->pause);
 
 	return 0;
 }
 
 /*
- * main netdev ethtool struct get/set
+ * main netdev ethtool struct get/set helpers
  */
 void
 ni_ethtool_free(ni_ethtool_t *ethtool)
