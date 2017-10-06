@@ -5,9 +5,9 @@
 
   <define name="configuration" class="dict">
     <pause class="dict">
-      <autoneg               type="tristate"/>
-      <rx                    type="tristate"/>
-      <tx                    type="tristate"/>
+      <autoneg               type="boolean"/>
+      <rx                    type="boolean"/>
+      <tx                    type="boolean"/>
     </pause>
   </define>
 
