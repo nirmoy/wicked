@@ -221,9 +221,9 @@ ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_e
 	param.rx_pause = ni_tristate_is_set(cfg->rx)      ? cfg->rx      : cur->rx;
 	param.tx_pause = ni_tristate_is_set(cfg->tx)      ? cfg->tx      : cur->tx;
 
-	ni_trace("%s: set pause param.autoneg: %u", ifname, param.autoneg);
-	ni_trace("%s: set pause param.rx: %u",      ifname, param.rx_pause);
-	ni_trace("%s: set pause param.tx: %u",      ifname, param.tx_pause);
+	ni_trace("%s: set pause (%u) param.autoneg: %u", ifname, cfg->autoneg, param.autoneg);
+	ni_trace("%s: set pause (%u) param.rx: %u",      ifname, cfg->autoneg, param.rx_pause);
+	ni_trace("%s: set pause (%u) param.tx: %u",      ifname, cfg->autoneg, param.tx_pause);
 
 	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0)
 		return -1;
