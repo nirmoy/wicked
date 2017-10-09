@@ -41,6 +41,12 @@ typedef struct ni_ethtool_driver_info {
 	} supports;
 } ni_ethtool_driver_info_t;
 
+typedef struct ni_ethtool_link_settings {
+	unsigned int			speed;
+	uint8_t				duplex;
+	uint8_t				port;
+} ni_ethtool_link_settings_t;
+
 typedef struct ni_ethtool_pause {
 	ni_tristate_t			autoneg;
 	ni_tristate_t			rx;
@@ -51,6 +57,8 @@ struct ni_ethtool {
 	unsigned int			unsupported;
 
 	ni_ethtool_driver_info_t *	driver_info;
+	ni_ethtool_link_settings_t *	link_settings;
+
 	ni_ethtool_pause_t *		pause;
 };
 
@@ -63,6 +71,9 @@ extern int				ni_ethtool_setup(ni_netdev_t *, const ni_ethtool_t *);
 
 extern ni_ethtool_driver_info_t *	ni_ethtool_driver_info_new(void);
 extern void				ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *);
+
+extern ni_ethtool_link_settings_t *	ni_ethtool_link_settings_new(void);
+extern void				ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *);
 
 extern ni_ethtool_pause_t *		ni_ethtool_pause_new(void);
 extern void				ni_ethtool_pause_free(ni_ethtool_pause_t *);

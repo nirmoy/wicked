@@ -144,6 +144,24 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	return 0;
 }
 
+ni_ethtool_link_settings_t *
+ni_ethtool_link_settings_new(void)
+{
+	ni_ethtool_link_settings_t *settings;
+
+	if ((settings = calloc(1, sizeof(*settings)))) {
+	}
+	return settings;
+}
+
+void
+ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
+{
+	if (settings) {
+		free(settings);
+	}
+}
+
 /*
  * pause (GPAUSEPARAM,SPAUSEPARAM)
  */
