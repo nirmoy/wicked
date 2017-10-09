@@ -42,6 +42,7 @@ typedef struct ni_ethtool_driver_info {
 } ni_ethtool_driver_info_t;
 
 typedef struct ni_ethtool_link_settings {
+	ni_tristate_t			autoneg;
 	unsigned int			speed;
 	uint8_t				duplex;
 	uint8_t				port;

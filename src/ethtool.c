@@ -188,6 +188,12 @@ ni_ethtool_link_settings_new(void)
 	ni_ethtool_link_settings_t *settings;
 
 	settings = calloc(1, sizeof(*settings));
+	if (settings) {
+		settings->autoneg = NI_TRISTATE_DEFAULT;
+		settings->speed	  = 0; /* down link */
+		settings->duplex  = DUPLEX_UNKNOWN;
+		settings->port    = PORT_OTHER;
+	}
 	return settings;
 }
 
@@ -229,6 +235,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 		return ret;
 	}
 
+	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
 	link->speed     = ethtool_cmd_speed(&settings);
 	link->duplex    = settings.duplex;
 	link->port      = settings.port;
@@ -284,6 +291,7 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_trace("%s: get link-settins.duplex: %u",	ifname, settings.duplex);
 	ni_trace("%s: get link-settins.port: %u",	ifname, settings.port);
 
+	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
 	link->speed     = settings.speed;
 	link->duplex    = settings.duplex;
 	link->port      = settings.port;
