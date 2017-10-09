@@ -33,8 +33,8 @@ typedef struct ni_ethtool_driver_info {
 	char *			fw_version;
 	char *			erom_version;
 	struct {
-		ni_bool_t	n_priv_flags;
-		ni_bool_t	n_stats;
+		unsigned int	n_priv_flags;
+		unsigned int	n_stats;
 		unsigned int	testinfo_len;
 		unsigned int	eedump_len;
 		unsigned int	regdump_len;
