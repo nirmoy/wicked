@@ -139,17 +139,15 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_driver_info_free(ethtool->driver_info);
 	ethtool->driver_info = NULL;
 
-	if (!(info = ni_ethtool_driver_info_new()))
-		return -1;
-
 	memset(&drv_info, 0, sizeof(drv_info));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GDRVINFO, &drv_info);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO,
 				!(ret < 0 && errno == EOPNOTSUPP));
-	if (ret < 0) {
-		ni_ethtool_driver_info_free(info);
+	if (ret < 0)
 		return ret;
-	}
+
+	if (!(info = ni_ethtool_driver_info_new()))
+		return -1;
 
 	drv_info.driver[sizeof(drv_info.driver)-1] = '\0';
 	if (!ni_string_empty(drv_info.driver))
@@ -223,17 +221,15 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_free(ethtool->link_settings);
 	ethtool->link_settings = NULL;
 
-	if (!(link = ni_ethtool_link_settings_new()))
-		return -1;
-
 	memset(&settings, 0, sizeof(settings));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &settings);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
 				!(ret < 0 && errno == EOPNOTSUPP));
-	if (ret < 0) {
-		ni_ethtool_link_settings_free(link);
+	if (ret < 0)
 		return ret;
-	}
+
+	if (!(link = ni_ethtool_link_settings_new()))
+		return -1;
 
 	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
 	link->speed     = ethtool_cmd_speed(&settings);
@@ -275,17 +271,18 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_free(ethtool->link_settings);
 	ethtool->link_settings = NULL;
 
-	if (!(link = ni_ethtool_link_settings_new()))
-		return -1;
-
 	memset(&settings, 0, sizeof(settings));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &settings);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0) {
-		ni_ethtool_link_settings_free(link);
+		if (errno == EOPNOTSUPP)
+			return ni_ethtool_get_legacy_settings(ifname, ethtool);
 		return ret;
 	}
+
+	if (!(link = ni_ethtool_link_settings_new()))
+		return -1;
 
 	ni_trace("%s: get link-settins.speed: %u",	ifname, settings.speed);
 	ni_trace("%s: get link-settins.duplex: %u",	ifname, settings.duplex);
@@ -349,17 +346,15 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_pause_free(ethtool->pause);
 	ethtool->pause = NULL;
 
-	if (!(pause = ni_ethtool_pause_new()))
-		return -1;
-
 	memset(&param, 0, sizeof(param));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
 				!(ret < 0 && errno == EOPNOTSUPP));
-	if (ret < 0) {
-		ni_ethtool_pause_free(pause);
+	if (ret < 0)
 		return ret;
-	}
+
+	if (!(pause = ni_ethtool_pause_new()))
+		return -1;
 
 	ni_trace("%s: get pause param.autoneg: %u", ifname, param.autoneg);
 	ni_trace("%s: get pause param.rx: %u",      ifname, param.rx_pause);

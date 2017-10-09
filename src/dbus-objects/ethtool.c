@@ -456,11 +456,13 @@ ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
 			fstem_name, ni_objectmodel_##type, rw)
 
 static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
-	ETHTOOL_UINT_PROPERTY(ethtool, autoneg,     autoneg, RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, link-speed,  link_speed, RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, port-type,   port_type, RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex, RO),
+	/* read-only (show-xml) info    */
 	ETHTOOL_DICT_PROPERTY(ethtool, driver-info, driver_info, RO),
+	/* also setup config properties */
+	ETHTOOL_BOOL_PROPERTY(ethtool, autoneg,     autoneg,     RO),
+	ETHTOOL_UINT_PROPERTY(ethtool, link-speed,  link_speed,  RO),
+	ETHTOOL_UINT_PROPERTY(ethtool, port-type,   port_type,   RO),
+	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex,      RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
 	{ NULL }
 };
