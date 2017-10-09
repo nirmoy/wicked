@@ -54,7 +54,7 @@ typedef struct ni_ethtool_pause {
 } ni_ethtool_pause_t;
 
 struct ni_ethtool {
-	unsigned int			unsupported;
+	unsigned int			supported;
 
 	ni_ethtool_driver_info_t *	driver_info;
 	ni_ethtool_link_settings_t *	link_settings;

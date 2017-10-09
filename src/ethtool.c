@@ -36,9 +36,34 @@
 #include "kernel.h"
 
 enum {
-	NI_ETHTOOL_SKIP_DRIVER_INFO	= NI_BIT(0),
-	NI_ETHTOOL_SKIP_PAUSE		= NI_BIT(1),
+	NI_ETHTOOL_SUPP_DRIVER_INFO,
+	NI_ETHTOOL_SUPP_PAUSE,
 };
+
+static inline ni_bool_t
+ni_ethtool_supported(const ni_ethtool_t *ethtool, unsigned int flag)
+{
+	return ethtool ? ethtool->supported & NI_BIT(flag) : FALSE;
+}
+
+static inline ni_bool_t
+ni_ethtool_unsupported(const ni_ethtool_t *ethtool, unsigned int flag)
+{
+	return !ni_ethtool_supported(ethtool, flag);
+}
+
+static inline ni_bool_t
+ni_ethtool_set_supported(ni_ethtool_t *ethtool, unsigned int flag, ni_bool_t enable)
+{
+	if (ethtool) {
+		if (enable)
+			ethtool->supported |= NI_BIT(flag);
+		else
+			ethtool->supported &= ~NI_BIT(flag);
+		return TRUE;
+	}
+	return FALSE;
+}
 
 /*
  * ethtool cmd error logging utilities
@@ -57,7 +82,8 @@ ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
 {
 	int ret, err;
 
-	if ((ret = __ni_ethtool(ifname, ioc->cmd, evp)) < 0) {
+	ret = __ni_ethtool(ifname, ioc->cmd, evp);
+	if (ret < 0) {
 		err = errno;
 		if (errno != EOPNOTSUPP && errno != ENODEV)
 			ni_warn("%s: ethtool %s failed: %m", ifname, ioc->name);
@@ -88,7 +114,10 @@ ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *info)
 ni_ethtool_driver_info_t *
 ni_ethtool_driver_info_new(void)
 {
-	return calloc(1, sizeof(ni_ethtool_driver_info_t));
+	ni_ethtool_driver_info_t *info;
+
+	info = calloc(1, sizeof(*info));
+	return info;
 }
 
 static int
@@ -96,22 +125,25 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 {
 	struct ethtool_drvinfo drv_info;
 	ni_ethtool_driver_info_t *info;
+	int ret;
 
-	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_DRIVER_INFO)
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO))
 		return -1;
 
 	ni_ethtool_driver_info_free(ethtool->driver_info);
 	ethtool->driver_info = NULL;
 
-	memset(&drv_info, 0, sizeof(drv_info));
-	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GDRVINFO, &drv_info) < 0) {
-		if (errno != EOPNOTSUPP)
-			ethtool->unsupported |= NI_ETHTOOL_SKIP_DRIVER_INFO;
-		return -1;
-	}
-
 	if (!(info = ni_ethtool_driver_info_new()))
 		return -1;
+
+	memset(&drv_info, 0, sizeof(drv_info));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GDRVINFO, &drv_info);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0) {
+		ni_ethtool_driver_info_free(info);
+		return ret;
+	}
 
 	drv_info.driver[sizeof(drv_info.driver)-1] = '\0';
 	if (!ni_string_empty(drv_info.driver))
@@ -149,8 +181,7 @@ ni_ethtool_link_settings_new(void)
 {
 	ni_ethtool_link_settings_t *settings;
 
-	if ((settings = calloc(1, sizeof(*settings)))) {
-	}
+	settings = calloc(1, sizeof(*settings));
 	return settings;
 }
 
@@ -176,7 +207,8 @@ ni_ethtool_pause_new(void)
 {
 	ni_ethtool_pause_t *pause;
 
-	if ((pause = calloc(1, sizeof(*pause)))) {
+	pause = calloc(1, sizeof(*pause));
+	if (pause) {
 		pause->autoneg = NI_TRISTATE_DEFAULT;
 		pause->rx      = NI_TRISTATE_DEFAULT;
 		pause->tx      = NI_TRISTATE_DEFAULT;
@@ -189,24 +221,25 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 {
 	struct ethtool_pauseparam param;
 	ni_ethtool_pause_t *pause;
+	int ret;
 
-	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE)
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
 		return -1;
 
 	ni_ethtool_pause_free(ethtool->pause);
 	ethtool->pause = NULL;
 
-	memset(&param, 0, sizeof(param));
-	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param) < 0) {
-#if 0
-		if (errno != EOPNOTSUPP)
-			ethtool->unsupported |= NI_ETHTOOL_SKIP_PAUSE;
-		return -1;
-#endif
-	}
-
 	if (!(pause = ni_ethtool_pause_new()))
 		return -1;
+
+	memset(&param, 0, sizeof(param));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0) {
+		ni_ethtool_pause_free(pause);
+		return ret;
+	}
 
 	ni_trace("%s: get pause param.autoneg: %u", ifname, param.autoneg);
 	ni_trace("%s: get pause param.rx: %u",      ifname, param.rx_pause);
@@ -221,16 +254,15 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 }
 
 static int
-ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_ethtool_pause_t *cfg)
+ni_ethtool_set_pause(const char *ifname, ni_ethtool_t *ethtool, const ni_ethtool_pause_t *cfg)
 {
 	struct ethtool_pauseparam param;
 	ni_ethtool_pause_t *cur;
 
 	ni_trace("%s(%s,ethtool=%p, cfg=%p)", __func__, ifname, ethtool, cfg);
-#if 0
-	if (!ethtool || ethtool->unsupported & NI_ETHTOOL_SKIP_PAUSE)
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
 		return -1;
-#endif
+
 	if (!cfg || !(cur = ethtool->pause))
 		return -1;
 
@@ -246,8 +278,11 @@ ni_ethtool_set_pause(const char *ifname, const ni_ethtool_t *ethtool, const ni_e
 	ni_trace("%s: set pause (%d => %d) param.tx: %u",
 			ifname, cur->tx,      cfg->tx,      param.tx_pause);
 
-	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0)
+	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0) {
+		if (errno == EOPNOTSUPP)
+			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE, FALSE);
 		return -1;
+	}
 
 	return 0;
 }
@@ -266,7 +301,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	if (!(ethtool = ni_ethtool_new()))
 		return FALSE;
 
-	ethtool->unsupported = dev->ethtool ? dev->ethtool->unsupported : 0U;
+	ethtool->supported = dev->ethtool ? dev->ethtool->supported : -1U;
 
 	apply = ni_ethtool_get_driver_info(dev->name, ethtool) == 0 || apply;
 	apply = ni_ethtool_get_pause(dev->name, ethtool) == 0 || apply;
@@ -330,7 +365,9 @@ ni_ethtool_new(void)
 	ni_ethtool_t *ethtool;
 
 	ethtool = calloc(1, sizeof(*ethtool));
-
+	if (ethtool) {
+		ethtool->supported = -1U;
+	}
 	return ethtool;
 }
 
