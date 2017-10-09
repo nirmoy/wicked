@@ -149,13 +149,12 @@ struct ni_ethtool {
 
 	ni_ethtool_driver_info_t *	driver_info;
 	ni_ethtool_link_settings_t *	link_settings;
-
 	ni_ethtool_pause_t *		pause;
-	ni_ethtool_offload_t	*offload;
-	ni_ethtool_eee_t	*eee;
-	ni_ethtool_ring_t	*ring;
-	ni_ethtool_coalesce_t	*coalesce;
-	ni_ethtool_channels_t	*channels;
+	ni_ethtool_offload_t *		offload;
+	ni_ethtool_eee_t *		eee;
+	ni_ethtool_ring_t *		ring;
+	ni_ethtool_coalesce_t *		coalesce;
+	ni_ethtool_channels_t *		channels;
 };
 
 extern ni_ethtool_t *			ni_ethtool_new(void);
