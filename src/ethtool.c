@@ -49,12 +49,6 @@ ni_ethtool_supported(const ni_ethtool_t *ethtool, unsigned int flag)
 }
 
 static inline ni_bool_t
-ni_ethtool_unsupported(const ni_ethtool_t *ethtool, unsigned int flag)
-{
-	return !ni_ethtool_supported(ethtool, flag);
-}
-
-static inline ni_bool_t
 ni_ethtool_set_supported(ni_ethtool_t *ethtool, unsigned int flag, ni_bool_t enable)
 {
 	if (ethtool) {
@@ -133,7 +127,7 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_driver_info_t *info;
 	int ret;
 
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO))
 		return -1;
 
 	ni_ethtool_driver_info_free(ethtool->driver_info);
@@ -215,7 +209,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 
 	ni_trace("%s(%s) TODO", __func__, ifname);
 
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY))
 		return -1;
 
 	ni_ethtool_link_settings_free(ethtool->link_settings);
@@ -265,7 +259,7 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 
 	ni_trace("%s(%s)", __func__, ifname);
 
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
 		return ni_ethtool_get_legacy_settings(ifname, ethtool);
 
 	ni_ethtool_link_settings_free(ethtool->link_settings);
@@ -304,7 +298,7 @@ ni_ethtool_set_link_settings(const char *ifname, ni_ethtool_t *ethtool,
 {
 	ni_trace("%s(%s)", __func__, ifname);
 
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
 		return ni_ethtool_set_legacy_settings(ifname, ethtool, cfg);
 
 	return 0;
@@ -340,7 +334,7 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_pause_t *pause;
 	int ret;
 
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
 		return -1;
 
 	ni_ethtool_pause_free(ethtool->pause);
@@ -375,7 +369,7 @@ ni_ethtool_set_pause(const char *ifname, ni_ethtool_t *ethtool, const ni_ethtool
 	ni_ethtool_pause_t *cur;
 
 	ni_trace("%s(%s,ethtool=%p, cfg=%p)", __func__, ifname, ethtool, cfg);
-	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
 		return -1;
 
 	if (!cfg || !(cur = ethtool->pause))
@@ -409,26 +403,21 @@ ni_bool_t
 ni_ethtool_refresh(ni_netdev_t *dev)
 {
 	ni_ethtool_t *ethtool;
-	ni_bool_t apply = FALSE;
 
-	ni_trace("%s(%s,%u)", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
+	ni_trace("%s(%s,%u [0x%x])", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0,
+			dev->ethtool ? dev->ethtool->supported : -1U);
 
 	if (!(ethtool = ni_ethtool_new()))
 		return FALSE;
 
 	ethtool->supported = dev->ethtool ? dev->ethtool->supported : -1U;
 
-	apply = ni_ethtool_get_driver_info(dev->name, ethtool) == 0 || apply;
-	apply = ni_ethtool_get_link_settings(dev->name, ethtool) == 0 || apply;
-	apply = ni_ethtool_get_pause(dev->name, ethtool) == 0 || apply;
+	ni_ethtool_get_driver_info(dev->name, ethtool);
+	ni_ethtool_get_link_settings(dev->name, ethtool);
+	ni_ethtool_get_pause(dev->name, ethtool);
 
-	if (apply) {
-		ni_netdev_set_ethtool(dev, ethtool);
-	} else {
-		ni_netdev_set_ethtool(dev, NULL);
-		ni_ethtool_free(ethtool);
-	}
-	return apply;
+	ni_netdev_set_ethtool(dev, ethtool);
+	return TRUE;
 }
 
 void
