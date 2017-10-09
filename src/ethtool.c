@@ -37,6 +37,8 @@
 
 enum {
 	NI_ETHTOOL_SUPP_DRIVER_INFO,
+	NI_ETHTOOL_SUPP_LINK_LEGACY,
+	NI_ETHTOOL_SUPP_LINK_SETTINGS,
 	NI_ETHTOOL_SUPP_PAUSE,
 };
 
@@ -73,9 +75,13 @@ typedef struct ni_ethtool_cmd_info {
 	const char *	name;
 } ni_ethtool_cmd_info_t;
 
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO	= { ETHTOOL_GDRVINFO,    "GDRVINFO" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM	= { ETHTOOL_GPAUSEPARAM, "GPAUSEPARAM" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SPAUSEPARAM	= { ETHTOOL_SPAUSEPARAM, "SPAUSEPARAM" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GSET		= { ETHTOOL_GSET,          "GSET" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SSET		= { ETHTOOL_SSET,          "SSET" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO	= { ETHTOOL_GDRVINFO,      "GDRVINFO" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM	= { ETHTOOL_GPAUSEPARAM,   "GPAUSEPARAM" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SPAUSEPARAM	= { ETHTOOL_SPAUSEPARAM,   "SPAUSEPARAM" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GLINKSETINGS	= { ETHTOOL_GLINKSETTINGS, "GLINKSETTINGS" };
+static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SLINKSETINGS	= { ETHTOOL_SLINKSETTINGS, "SLINKSETTINGS" };
 
 static int
 ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
@@ -194,6 +200,112 @@ ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
 }
 
 /*
+ * legacy link-settings (GSET,SSET)
+ */
+static int
+ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
+{
+	struct ethtool_cmd settings;
+	ni_ethtool_link_settings_t *link;
+	int ret;
+
+	ni_trace("%s(%s) TODO", __func__, ifname);
+
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY))
+		return -1;
+
+	ni_ethtool_link_settings_free(ethtool->link_settings);
+	ethtool->link_settings = NULL;
+
+	if (!(link = ni_ethtool_link_settings_new()))
+		return -1;
+
+	memset(&settings, 0, sizeof(settings));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &settings);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0) {
+		ni_ethtool_link_settings_free(link);
+		return ret;
+	}
+
+	link->speed     = ethtool_cmd_speed(&settings);
+	link->duplex    = settings.duplex;
+	link->port      = settings.port;
+
+	ethtool->link_settings = link;
+	return 0;
+}
+
+static int
+ni_ethtool_set_legacy_settings(const char *ifname, ni_ethtool_t *ethtool,
+		const ni_ethtool_link_settings_t *cfg)
+{
+	(void)ifname;
+	(void)ethtool;
+	(void)cfg;
+
+	ni_trace("%s(%s) TODO", __func__, ifname);
+
+	return 0;
+}
+
+/*
+ * updated link-settings (GLINKSETTINGS,SLINKSETTINGS)
+ */
+static int
+ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
+{
+	struct ethtool_link_settings settings;
+	ni_ethtool_link_settings_t *link;
+	int ret;
+
+	ni_trace("%s(%s)", __func__, ifname);
+
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
+		return ni_ethtool_get_legacy_settings(ifname, ethtool);
+
+	ni_ethtool_link_settings_free(ethtool->link_settings);
+	ethtool->link_settings = NULL;
+
+	if (!(link = ni_ethtool_link_settings_new()))
+		return -1;
+
+	memset(&settings, 0, sizeof(settings));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &settings);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0) {
+		ni_ethtool_link_settings_free(link);
+		return ret;
+	}
+
+	ni_trace("%s: get link-settins.speed: %u",	ifname, settings.speed);
+	ni_trace("%s: get link-settins.duplex: %u",	ifname, settings.duplex);
+	ni_trace("%s: get link-settins.port: %u",	ifname, settings.port);
+
+	link->speed     = settings.speed;
+	link->duplex    = settings.duplex;
+	link->port      = settings.port;
+
+	ethtool->link_settings = link;
+	return 0;
+
+}
+
+static int
+ni_ethtool_set_link_settings(const char *ifname, ni_ethtool_t *ethtool,
+			const ni_ethtool_link_settings_t *cfg)
+{
+	ni_trace("%s(%s)", __func__, ifname);
+
+	if (ni_ethtool_unsupported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
+		return ni_ethtool_set_legacy_settings(ifname, ethtool, cfg);
+
+	return 0;
+}
+
+/*
  * pause (GPAUSEPARAM,SPAUSEPARAM)
  */
 void
@@ -304,6 +416,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ethtool->supported = dev->ethtool ? dev->ethtool->supported : -1U;
 
 	apply = ni_ethtool_get_driver_info(dev->name, ethtool) == 0 || apply;
+	apply = ni_ethtool_get_link_settings(dev->name, ethtool) == 0 || apply;
 	apply = ni_ethtool_get_pause(dev->name, ethtool) == 0 || apply;
 
 	if (apply) {
@@ -343,6 +456,7 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 	}
 
 	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->ethtool->pause);
+	ni_ethtool_set_link_settings(dev->name, dev->ethtool, cfg->ethtool->link_settings);
 
 	return 0;
 }
