@@ -35,11 +35,17 @@
 #include "util_priv.h"
 #include "kernel.h"
 
+/*
+ * support mask to not repeat ioctl
+ * calls that returned EOPNOTSUPP.
+ */
 enum {
 	NI_ETHTOOL_SUPP_DRIVER_INFO,
 	NI_ETHTOOL_SUPP_LINK_LEGACY,
 	NI_ETHTOOL_SUPP_LINK_SETTINGS,
 	NI_ETHTOOL_SUPP_PAUSE,
+
+	NI_ETHTOOL_SUPPORT_MAX
 };
 
 static inline ni_bool_t
@@ -69,16 +75,8 @@ typedef struct ni_ethtool_cmd_info {
 	const char *	name;
 } ni_ethtool_cmd_info_t;
 
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GSET		= { ETHTOOL_GSET,          "GSET" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SSET		= { ETHTOOL_SSET,          "SSET" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO	= { ETHTOOL_GDRVINFO,      "GDRVINFO" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM	= { ETHTOOL_GPAUSEPARAM,   "GPAUSEPARAM" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SPAUSEPARAM	= { ETHTOOL_SPAUSEPARAM,   "SPAUSEPARAM" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GLINKSETINGS	= { ETHTOOL_GLINKSETTINGS, "GLINKSETTINGS" };
-static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SLINKSETINGS	= { ETHTOOL_SLINKSETTINGS, "SLINKSETTINGS" };
-
 static int
-ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
+ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp, const char *flag)
 {
 	int ret, err;
 
@@ -86,10 +84,10 @@ ni_ethtool_call(const char *ifname, const ni_ethtool_cmd_info_t *ioc, void *evp)
 	if (ret < 0) {
 		err = errno;
 		if (errno != EOPNOTSUPP && errno != ENODEV)
-			ni_warn("%s: ethtool %s failed: %m", ifname, ioc->name);
+			ni_warn("%s: ethtool %s%s failed: %m", ifname, ioc->name, flag ? flag : "");
 		else
 			ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
-				"%s: ethtool %s failed: %m", ifname, ioc->name);
+				"%s: ethtool %s%s failed: %m", ifname, ioc->name, flag ? flag : "");
 		errno = err;
 	}
 	return ret;
@@ -123,6 +121,9 @@ ni_ethtool_driver_info_new(void)
 static int
 ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 {
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GDRVINFO = {
+		ETHTOOL_GDRVINFO,      "get driver-info"
+	};
 	struct ethtool_drvinfo drv_info;
 	ni_ethtool_driver_info_t *info;
 	int ret;
@@ -134,7 +135,7 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	ethtool->driver_info = NULL;
 
 	memset(&drv_info, 0, sizeof(drv_info));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GDRVINFO, &drv_info);
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GDRVINFO, &drv_info, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_DRIVER_INFO,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0)
@@ -203,6 +204,9 @@ ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
 static int
 ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 {
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GSET	= {
+		ETHTOOL_GSET,          "get settings"
+	};
 	struct ethtool_cmd settings;
 	ni_ethtool_link_settings_t *link;
 	int ret;
@@ -216,7 +220,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ethtool->link_settings = NULL;
 
 	memset(&settings, 0, sizeof(settings));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &settings);
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &settings, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0)
@@ -238,6 +242,11 @@ static int
 ni_ethtool_set_legacy_settings(const char *ifname, ni_ethtool_t *ethtool,
 		const ni_ethtool_link_settings_t *cfg)
 {
+#if 0
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SSET	= {
+		ETHTOOL_SSET,		"set settings"
+	};
+#endif
 	(void)ifname;
 	(void)ethtool;
 	(void)cfg;
@@ -253,6 +262,9 @@ ni_ethtool_set_legacy_settings(const char *ifname, ni_ethtool_t *ethtool,
 static int
 ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 {
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GLINKSETINGS = {
+		ETHTOOL_GLINKSETTINGS,	"get link-settings"
+	};
 	struct ethtool_link_settings settings;
 	ni_ethtool_link_settings_t *link;
 	int ret;
@@ -266,7 +278,7 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ethtool->link_settings = NULL;
 
 	memset(&settings, 0, sizeof(settings));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &settings);
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &settings, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0) {
@@ -277,10 +289,6 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 
 	if (!(link = ni_ethtool_link_settings_new()))
 		return -1;
-
-	ni_trace("%s: get link-settins.speed: %u",	ifname, settings.speed);
-	ni_trace("%s: get link-settins.duplex: %u",	ifname, settings.duplex);
-	ni_trace("%s: get link-settins.port: %u",	ifname, settings.port);
 
 	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
 	link->speed     = settings.speed;
@@ -296,6 +304,11 @@ static int
 ni_ethtool_set_link_settings(const char *ifname, ni_ethtool_t *ethtool,
 			const ni_ethtool_link_settings_t *cfg)
 {
+#if 0
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SLINKSETINGS = {
+		ETHTOOL_SLINKSETTINGS,	"set link-settings"
+	};
+#endif
 	ni_trace("%s(%s)", __func__, ifname);
 
 	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
@@ -330,6 +343,9 @@ ni_ethtool_pause_new(void)
 static int
 ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 {
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM = {
+		ETHTOOL_GPAUSEPARAM,	"get pause"
+	};
 	struct ethtool_pauseparam param;
 	ni_ethtool_pause_t *pause;
 	int ret;
@@ -341,7 +357,7 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 	ethtool->pause = NULL;
 
 	memset(&param, 0, sizeof(param));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param);
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0)
@@ -349,10 +365,6 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 
 	if (!(pause = ni_ethtool_pause_new()))
 		return -1;
-
-	ni_trace("%s: get pause param.autoneg: %u", ifname, param.autoneg);
-	ni_trace("%s: get pause param.rx: %u",      ifname, param.rx_pause);
-	ni_trace("%s: get pause param.tx: %u",      ifname, param.tx_pause);
 
 	ni_tristate_set(&pause->autoneg, param.autoneg);
 	ni_tristate_set(&pause->rx,      param.rx_pause);
@@ -365,35 +377,38 @@ ni_ethtool_get_pause(const char *ifname, ni_ethtool_t *ethtool)
 static int
 ni_ethtool_set_pause(const char *ifname, ni_ethtool_t *ethtool, const ni_ethtool_pause_t *cfg)
 {
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GPAUSEPARAM = {
+		ETHTOOL_GPAUSEPARAM,	"get pause"
+	};
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SPAUSEPARAM = {
+		ETHTOOL_SPAUSEPARAM,	"set pause"
+	};
 	struct ethtool_pauseparam param;
-	ni_ethtool_pause_t *cur;
+	int ret;
 
-	ni_trace("%s(%s,ethtool=%p, cfg=%p)", __func__, ifname, ethtool, cfg);
+	if (!cfg)
+		return  1; /* nothing to set */
 	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE))
-		return -1;
-
-	if (!cfg || !(cur = ethtool->pause))
-		return -1;
+		return -1; /* unsupported    */
 
 	memset(&param, 0, sizeof(param));
-	param.autoneg  = ni_tristate_is_set(cfg->autoneg) ? cfg->autoneg : cur->autoneg;
-	param.rx_pause = ni_tristate_is_set(cfg->rx)      ? cfg->rx      : cur->rx;
-	param.tx_pause = ni_tristate_is_set(cfg->tx)      ? cfg->tx      : cur->tx;
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GPAUSEPARAM, &param, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
 
-	ni_trace("%s: set pause (%d => %d) param.autoneg: %u",
-			ifname, cur->autoneg, cfg->autoneg, param.autoneg);
-	ni_trace("%s: set pause (%d => %d) param.rx: %u",
-			ifname, cur->rx,      cfg->rx,      param.rx_pause);
-	ni_trace("%s: set pause (%d => %d) param.tx: %u",
-			ifname, cur->tx,      cfg->tx,      param.tx_pause);
+	if (ni_tristate_is_set(cfg->autoneg))
+		param.autoneg  = cfg->autoneg;
+	if (ni_tristate_is_set(cfg->rx))
+		param.rx_pause = cfg->rx;
+	if (ni_tristate_is_set(cfg->tx))
+		param.tx_pause = cfg->tx;
 
-	if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param) < 0) {
-		if (errno == EOPNOTSUPP)
-			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE, FALSE);
-		return -1;
-	}
-
-	return 0;
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SPAUSEPARAM, &param, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	return ret;
 }
 
 /*
@@ -404,13 +419,14 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 {
 	ni_ethtool_t *ethtool;
 
-	ni_trace("%s(%s,%u [0x%x])", __func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0,
-			dev->ethtool ? dev->ethtool->supported : -1U);
+	ni_trace("%s(%s,%u)", __func__, dev ? dev->name : NULL,
+					dev ? dev->link.ifindex : 0);
 
 	if (!(ethtool = ni_ethtool_new()))
 		return FALSE;
 
-	ethtool->supported = dev->ethtool ? dev->ethtool->supported : -1U;
+	if (dev->ethtool)
+		ethtool->supported = dev->ethtool->supported;
 
 	ni_ethtool_get_driver_info(dev->name, ethtool);
 	ni_ethtool_get_link_settings(dev->name, ethtool);
@@ -424,6 +440,9 @@ void
 ni_system_ethtool_refresh(ni_netdev_t *dev)
 {
 	if (!ni_netdev_device_is_ready(dev) || !dev->link.ifindex)
+		return;
+
+	if (dev->ethtool && !dev->ethtool->supported)
 		return;
 
 	ni_ethtool_refresh(dev);
@@ -440,8 +459,7 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 		return -1;
 	}
 
-	ni_ethtool_refresh(dev);
-	if (!dev->ethtool) {
+	if (!dev->ethtool && !ni_ethtool_refresh(dev)) {
 		ni_trace("%s(%s,%u) no ethtool or refresh failed",
 				__func__, dev ? dev->name : NULL, dev ? dev->link.ifindex : 0);
 		return -1;
@@ -450,6 +468,7 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->ethtool->pause);
 	ni_ethtool_set_link_settings(dev->name, dev->ethtool, cfg->ethtool->link_settings);
 
+	ni_ethtool_refresh(dev);
 	return 0;
 }
 
@@ -465,6 +484,19 @@ ni_ethtool_free(ni_ethtool_t *ethtool)
 	}
 }
 
+unsigned int
+ni_ethtool_supported_mask(void)
+{
+	static unsigned int supported = 0;
+	unsigned int i;
+
+	if (!supported) {
+		for (i = 0; i < NI_ETHTOOL_SUPPORT_MAX; ++i)
+			supported |= NI_BIT(i);
+	}
+	return supported;
+}
+
 ni_ethtool_t *
 ni_ethtool_new(void)
 {
@@ -472,7 +504,7 @@ ni_ethtool_new(void)
 
 	ethtool = calloc(1, sizeof(*ethtool));
 	if (ethtool) {
-		ethtool->supported = -1U;
+		ethtool->supported = ni_ethtool_supported_mask();
 	}
 	return ethtool;
 }
