@@ -7,7 +7,7 @@
     <autoneg                 type="boolean"/>
     <link-speed              type="uint32"/>
     <port-type               type="builtin-ethtool-port-type"/>
-    <duplex                  type="builtin-ethtool-duplex"/>
+    <duplex                  type="builtin-ethtool-duplex-mode"/>
     <pause class="dict">
       <autoneg               type="boolean"/>
       <rx                    type="boolean"/>
