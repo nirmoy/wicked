@@ -889,21 +889,11 @@ static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
 	ETHTOOL_UINT_PROPERTY(ethtool, port-type,   port_type,   RO),
 	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex,      RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, offload,     features,    RO),
+	ETHTOOL_DICT_PROPERTY(ethtool, channels,    channels,    RO),
+	ETHTOOL_DICT_PROPERTY(ethtool, coalesce,    coalesce,    RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
-	__NI_DBUS_PROPERTY(
-			NI_DBUS_DICT_SIGNATURE,
-			eee, ni_objectmodel_ethtool, RO),
-	__NI_DBUS_PROPERTY(
-			NI_DBUS_DICT_SIGNATURE,
-			ring, ni_objectmodel_ethtool, RO),
-	__NI_DBUS_PROPERTY(
-			NI_DBUS_DICT_SIGNATURE,
-			coalesce, ni_objectmodel_ethtool, RO),
-	__NI_DBUS_PROPERTY(
-			NI_DBUS_DICT_SIGNATURE,
-			channels, ni_objectmodel_ethtool, RO),
-
-
+	ETHTOOL_DICT_PROPERTY(ethtool, ring,        ring,        RO),
+	ETHTOOL_DICT_PROPERTY(ethtool, eee,         eee,        RO),
 
 	{ NULL }
 };
