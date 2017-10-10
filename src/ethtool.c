@@ -35,6 +35,51 @@
 #include "util_priv.h"
 #include "kernel.h"
 
+/* duplex mode name map */
+static const ni_intmap_t	ni_ethternet_duplex_names[] = {
+	{ "half",		NI_ETHTOOL_DUPLEX_HALF		},
+	{ "full",		NI_ETHTOOL_DUPLEX_FULL		},
+
+	{ NULL,			NI_ETHTOOL_DUPLEX_UNKNOWN	}
+};
+
+ni_bool_t
+ni_ethtool_duplex_mode(const char *name, ni_ethtool_duplex_t *mode)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_duplex_names, mode) == 0;
+}
+
+const char *
+ni_ethtool_duplex_name(ni_ethtool_duplex_t mode)
+{
+	return ni_format_uint_mapped(mode, ni_ethternet_duplex_names);
+}
+
+/* port type name map */
+static const ni_intmap_t	ni_ethternet_port_type_names[] = {
+	{ "tp",			NI_ETHTOOL_PORT_TP		},
+	{ "aui",		NI_ETHTOOL_PORT_AUI		},
+	{ "bnc",		NI_ETHTOOL_PORT_BNC		},
+	{ "mii",		NI_ETHTOOL_PORT_MII		},
+	{ "fibre",		NI_ETHTOOL_PORT_FIBRE		},
+	{ "da",			NI_ETHTOOL_PORT_DA		},
+	{ "none",		NI_ETHTOOL_PORT_NONE		},
+
+	{ NULL,			NI_ETHTOOL_PORT_OTHER		}
+};
+
+ni_bool_t
+ni_ethtool_port_type(const char *name, ni_ethtool_port_type_t *type)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
+}
+
+const char *
+ni_ethtool_port_name(ni_ethtool_port_type_t type)
+{
+	return ni_format_uint_mapped(type, ni_ethternet_port_type_names);
+}
+
 /*
  * support mask to not repeat ioctl
  * calls that returned EOPNOTSUPP.
@@ -183,9 +228,9 @@ ni_ethtool_link_settings_new(void)
 	settings = calloc(1, sizeof(*settings));
 	if (settings) {
 		settings->autoneg = NI_TRISTATE_DEFAULT;
-		settings->speed	  = 0; /* down link */
-		settings->duplex  = DUPLEX_UNKNOWN;
-		settings->port    = PORT_OTHER;
+		settings->speed	  = NI_ETHTOOL_SPEED_UNKNOWN;
+		settings->duplex  = NI_ETHTOOL_DUPLEX_UNKNOWN;
+		settings->port    = NI_ETHTOOL_PORT_OTHER;
 	}
 	return settings;
 }

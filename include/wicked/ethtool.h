@@ -41,6 +41,25 @@ typedef struct ni_ethtool_driver_info {
 	} supports;
 } ni_ethtool_driver_info_t;
 
+#define NI_ETHTOOL_SPEED_UNKNOWN	-1U
+
+typedef enum {
+	NI_ETHTOOL_DUPLEX_HALF,
+	NI_ETHTOOL_DUPLEX_FULL,
+	NI_ETHTOOL_DUPLEX_UNKNOWN	= 0xff,
+} ni_ethtool_duplex_t;
+
+typedef enum {
+	NI_ETHTOOL_PORT_TP,
+	NI_ETHTOOL_PORT_AUI,
+	NI_ETHTOOL_PORT_BNC,
+	NI_ETHTOOL_PORT_MII,
+	NI_ETHTOOL_PORT_FIBRE,
+	NI_ETHTOOL_PORT_DA,
+	NI_ETHTOOL_PORT_NONE		= 0xfe,
+	NI_ETHTOOL_PORT_OTHER		= 0xff
+} ni_ethtool_port_type_t;
+
 typedef struct ni_ethtool_link_settings {
 	ni_tristate_t			autoneg;
 	unsigned int			speed;
