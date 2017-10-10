@@ -525,6 +525,8 @@ ni_ethtool_free(ni_ethtool_t *ethtool)
 {
 	if (ethtool) {
 		ni_ethtool_driver_info_free(ethtool->driver_info);
+		ni_ethtool_link_settings_free(ethtool->link_settings);
+		ni_ethtool_pause_free(ethtool->pause);
 		free(ethtool);
 	}
 }
