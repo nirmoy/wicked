@@ -232,3 +232,9 @@
 <define name="builtin-gre-encap-flag-mask" type="uint16" constraint="bitmap">
   <@@GRE_ENCAP_FLAG_BIT_NAME@@ bit="@@GRE_ENCAP_FLAG_BIT_VALUE@@"/>
 </define>
+<define name="builtin-ethtool-port-type" type="uint32" constraint="enum">
+  <@@ETHTOOL_PORT_TYPE_NAME@@ value="@@ETHTOOL_PORT_TYPE_VALUE@@"/>
+</define>
+<define name="builtin-ethtool-duplex-mode" type="uint32" constraint="enum">
+  <@@ETHTOOL_DUPLEX_MODE_NAME@@ value="@@ETHTOOL_DUPLEX_MODE_VALUE@@"/>
+</define>

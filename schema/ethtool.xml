@@ -6,8 +6,8 @@
   <define name="configuration" class="dict">
     <autoneg                 type="boolean"/>
     <link-speed              type="uint32"/>
-    <port-type               type="uint32"/>
-    <duplex                  type="uint32"/>
+    <port-type               type="builtin-ethtool-port-type"/>
+    <duplex                  type="builtin-ethtool-duplex"/>
     <pause class="dict">
       <autoneg               type="boolean"/>
       <rx                    type="boolean"/>
