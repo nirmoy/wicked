@@ -35,51 +35,6 @@
 #include "util_priv.h"
 #include "kernel.h"
 
-/* duplex mode name map */
-static const ni_intmap_t	ni_ethternet_duplex_names[] = {
-	{ "half",		NI_ETHTOOL_DUPLEX_HALF		},
-	{ "full",		NI_ETHTOOL_DUPLEX_FULL		},
-
-	{ NULL,			NI_ETHTOOL_DUPLEX_UNKNOWN	}
-};
-
-ni_bool_t
-ni_ethtool_duplex_mode(const char *name, ni_ethtool_duplex_t *mode)
-{
-	return ni_parse_uint_mapped(name, ni_ethternet_duplex_names, mode) == 0;
-}
-
-const char *
-ni_ethtool_duplex_name(ni_ethtool_duplex_t mode)
-{
-	return ni_format_uint_mapped(mode, ni_ethternet_duplex_names);
-}
-
-/* port type name map */
-static const ni_intmap_t	ni_ethternet_port_type_names[] = {
-	{ "tp",			NI_ETHTOOL_PORT_TP		},
-	{ "aui",		NI_ETHTOOL_PORT_AUI		},
-	{ "bnc",		NI_ETHTOOL_PORT_BNC		},
-	{ "mii",		NI_ETHTOOL_PORT_MII		},
-	{ "fibre",		NI_ETHTOOL_PORT_FIBRE		},
-	{ "da",			NI_ETHTOOL_PORT_DA		},
-	{ "none",		NI_ETHTOOL_PORT_NONE		},
-
-	{ NULL,			NI_ETHTOOL_PORT_OTHER		}
-};
-
-ni_bool_t
-ni_ethtool_port_type(const char *name, ni_ethtool_port_type_t *type)
-{
-	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
-}
-
-const char *
-ni_ethtool_port_name(ni_ethtool_port_type_t type)
-{
-	return ni_format_uint_mapped(type, ni_ethternet_port_type_names);
-}
-
 /*
  * support mask to not repeat ioctl
  * calls that returned EOPNOTSUPP.
@@ -220,6 +175,61 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 	return 0;
 }
 
+
+/*
+ * new and legacy link-settings
+ */
+static const ni_intmap_t	ni_ethternet_duplex_names[] = {
+	{ "half",		NI_ETHTOOL_DUPLEX_HALF		},
+	{ "full",		NI_ETHTOOL_DUPLEX_FULL		},
+
+	{ NULL,			NI_ETHTOOL_DUPLEX_UNKNOWN	}
+};
+
+ni_bool_t
+ni_ethtool_duplex_map_name(const char *name, ni_ethtool_duplex_t *mode)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_duplex_names, mode) == 0;
+}
+
+const char *
+ni_ethtool_duplex_map_mode(ni_ethtool_duplex_t mode)
+{
+	return ni_format_uint_mapped(mode, ni_ethternet_duplex_names);
+}
+
+static const ni_intmap_t	ni_ethternet_port_type_names[] = {
+	{ "tp",			NI_ETHTOOL_PORT_TP		},
+	{ "aui",		NI_ETHTOOL_PORT_AUI		},
+	{ "bnc",		NI_ETHTOOL_PORT_BNC		},
+	{ "mii",		NI_ETHTOOL_PORT_MII		},
+	{ "fibre",		NI_ETHTOOL_PORT_FIBRE		},
+	{ "da",			NI_ETHTOOL_PORT_DA		},
+	{ "none",		NI_ETHTOOL_PORT_NONE		},
+
+	{ NULL,			NI_ETHTOOL_PORT_OTHER		}
+};
+
+ni_bool_t
+ni_ethtool_port_map_type(const char *name, ni_ethtool_port_type_t *type)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
+}
+
+const char *
+ni_ethtool_port_map_name(ni_ethtool_port_type_t type)
+{
+	return ni_format_uint_mapped(type, ni_ethternet_port_type_names);
+}
+
+void
+ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
+{
+	if (settings) {
+		free(settings);
+	}
+}
+
 ni_ethtool_link_settings_t *
 ni_ethtool_link_settings_new(void)
 {
@@ -233,14 +243,6 @@ ni_ethtool_link_settings_new(void)
 		settings->port    = NI_ETHTOOL_PORT_OTHER;
 	}
 	return settings;
-}
-
-void
-ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
-{
-	if (settings) {
-		free(settings);
-	}
 }
 
 /*
@@ -302,7 +304,7 @@ ni_ethtool_set_legacy_settings(const char *ifname, ni_ethtool_t *ethtool,
 }
 
 /*
- * updated link-settings (GLINKSETTINGS,SLINKSETTINGS)
+ * new link-settings (GLINKSETTINGS,SLINKSETTINGS)
  */
 static int
 ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
