@@ -511,6 +511,361 @@ ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
 	return TRUE;
 }
 
+static dbus_bool_t
+ni_objectmodel_ethtool_get_coalesce(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (ethtool->coalesce->supported == NI_TRISTATE_DISABLE)
+		return FALSE;
+
+	if (ethtool->coalesce->adaptive_rx != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "adaptive-rx", ethtool->coalesce->adaptive_rx);
+
+	if (ethtool->coalesce->adaptive_tx != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "adaptive-tx", ethtool->coalesce->adaptive_tx);
+
+	if (ethtool->coalesce->rx_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-usecs", ethtool->coalesce->rx_usecs);
+	}
+	if (ethtool->coalesce->rx_frames != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-frames", ethtool->coalesce->rx_frames);
+	}
+	if (ethtool->coalesce->rx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-usecs-irq", ethtool->coalesce->rx_usecs_irq);
+	}
+	if (ethtool->coalesce->rx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-frames-irq", ethtool->coalesce->rx_frames_irq);
+	}
+	if (ethtool->coalesce->tx_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-usecs", ethtool->coalesce->tx_usecs);
+	}
+	if (ethtool->coalesce->tx_frames != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-frames", ethtool->coalesce->tx_frames);
+	}
+	if (ethtool->coalesce->tx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-usecs-irq", ethtool->coalesce->tx_usecs_irq);
+	}
+	if (ethtool->coalesce->tx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-frames-irq", ethtool->coalesce->tx_frames_irq);
+	}
+	if (ethtool->coalesce->stats_block_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "stats-block-usecs", ethtool->coalesce->stats_block_usecs);
+	}
+	if (ethtool->coalesce->pkt_rate_low != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "pkt-rate-low", ethtool->coalesce->pkt_rate_low);
+	}
+	if (ethtool->coalesce->rx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-usecs-low", ethtool->coalesce->rx_usecs_low);
+	}
+	if (ethtool->coalesce->rx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-frames-low", ethtool->coalesce->rx_frames_low);
+	}
+	if (ethtool->coalesce->tx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-usecs-low", ethtool->coalesce->tx_usecs_low);
+	}
+	if (ethtool->coalesce->tx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-frames-low", ethtool->coalesce->tx_frames_low);
+	}
+	if (ethtool->coalesce->pkt_rate_high != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "pkt-rate-high", ethtool->coalesce->pkt_rate_high);
+	}
+	if (ethtool->coalesce->rx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-usecs-high", ethtool->coalesce->rx_usecs_high);
+	}
+	if (ethtool->coalesce->rx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "rx-frames-high", ethtool->coalesce->rx_frames_high);
+	}
+	if (ethtool->coalesce->tx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-usecs-high", ethtool->coalesce->tx_usecs_high);
+	}
+	if (ethtool->coalesce->tx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "tx-frames-high", ethtool->coalesce->tx_frames_high);
+	}
+	if (ethtool->coalesce->sample_interval != NI_ETHTOOL_COALESCE_DEFAULT) {
+		ni_dbus_dict_add_uint32(result, "sample-interval", ethtool->coalesce->sample_interval);
+	}
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_coalesce(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	if (!ni_dbus_dict_get_int32(argument, "adaptive-rx", &ethtool->coalesce->adaptive_rx))
+		ethtool->coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
+
+	if (!ni_dbus_dict_get_int32(argument, "adaptive-tx", &ethtool->coalesce->adaptive_tx))
+		ethtool->coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
+
+	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs", &ethtool->coalesce->rx_usecs)) {
+		ethtool->coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-frames", &ethtool->coalesce->rx_frames)) {
+		ethtool->coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-irq", &ethtool->coalesce->rx_usecs_irq)) {
+		ethtool->coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-irq", &ethtool->coalesce->rx_frames_irq)) {
+		ethtool->coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs", &ethtool->coalesce->tx_usecs)) {
+		ethtool->coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-frames", &ethtool->coalesce->tx_frames)) {
+		ethtool->coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-irq", &ethtool->coalesce->tx_usecs_irq)) {
+		ethtool->coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-irq", &ethtool->coalesce->tx_frames_irq)) {
+		ethtool->coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "stats-block-usecs", &ethtool->coalesce->stats_block_usecs)) {
+		ethtool->coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "pkt-rate-low", &ethtool->coalesce->pkt_rate_low)) {
+		ethtool->coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-low", &ethtool->coalesce->rx_usecs_low)) {
+		ethtool->coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-low", &ethtool->coalesce->rx_frames_low)) {
+		ethtool->coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-low", &ethtool->coalesce->tx_usecs_low)) {
+		ethtool->coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-low", &ethtool->coalesce->tx_frames_low)) {
+		ethtool->coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "pkt-rate-high", &ethtool->coalesce->pkt_rate_high)) {
+		ethtool->coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-high", &ethtool->coalesce->rx_usecs_high)) {
+		ethtool->coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-high", &ethtool->coalesce->rx_frames_high)) {
+		ethtool->coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-high", &ethtool->coalesce->tx_usecs_high)) {
+		ethtool->coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-high", &ethtool->coalesce->tx_frames_high)) {
+		ethtool->coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+	if (!ni_dbus_dict_get_uint32(argument, "sample-interval", &ethtool->coalesce->sample_interval)) {
+		ethtool->coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_eee(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (ethtool->eee->supported == NI_TRISTATE_DISABLE)
+		return FALSE;
+
+	if (ethtool->eee->status.enabled != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "enabled", ethtool->eee->status.enabled);
+	if (ethtool->eee->status.active != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "active", ethtool->eee->status.active);
+
+	if (ethtool->eee->speed.supported != NI_ETHTOOL_EEE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "supported", ethtool->eee->speed.supported);
+	if (ethtool->eee->speed.advertised != NI_ETHTOOL_EEE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "advertise", ethtool->eee->speed.advertised);
+	if (ethtool->eee->speed.lp_advertised != NI_ETHTOOL_EEE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "lp-advertised", ethtool->eee->speed.lp_advertised);
+
+	if (ethtool->eee->tx_lpi.enabled != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "tx-lpi", ethtool->eee->tx_lpi.enabled);
+	if (ethtool->eee->tx_lpi.timer != NI_ETHTOOL_EEE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-timer", ethtool->eee->tx_lpi.timer);
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_eee(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	if (!ni_dbus_dict_get_int32(argument, "enabled", &ethtool->eee->status.enabled))
+		ethtool->eee->status.enabled = NI_TRISTATE_DEFAULT;
+	if (!ni_dbus_dict_get_int32(argument, "active",  &ethtool->eee->status.active))
+		ethtool->eee->status.active = NI_TRISTATE_DEFAULT;
+
+	if (!ni_dbus_dict_get_uint32(argument, "supported", &ethtool->eee->speed.supported))
+		ethtool->eee->speed.supported = NI_ETHTOOL_EEE_DEFAULT;
+	if (!ni_dbus_dict_get_uint32(argument, "advertise", &ethtool->eee->speed.advertised))
+		ethtool->eee->speed.advertised = NI_ETHTOOL_EEE_DEFAULT;
+	if (!ni_dbus_dict_get_uint32(argument, "lp-advertised", &ethtool->eee->speed.lp_advertised))
+		ethtool->eee->speed.lp_advertised = NI_ETHTOOL_EEE_DEFAULT;
+
+	if (!ni_dbus_dict_get_int32(argument, "tx-lpi", &ethtool->eee->tx_lpi.enabled))
+		ethtool->eee->tx_lpi.enabled = NI_TRISTATE_DEFAULT;
+	if (!ni_dbus_dict_get_uint32(argument, "tx-timer", &ethtool->eee->tx_lpi.timer))
+		ethtool->eee->tx_lpi.timer = NI_ETHTOOL_EEE_DEFAULT;
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_channels(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (ethtool->channels->supported == NI_TRISTATE_DISABLE)
+		return FALSE;
+
+	if (ethtool->channels->tx != NI_ETHTOOL_CHANNELS_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "tx", ethtool->channels->tx);
+	}
+
+	if (ethtool->channels->rx != NI_ETHTOOL_CHANNELS_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "rx", ethtool->channels->rx);
+	}
+
+	if (ethtool->channels->other != NI_ETHTOOL_CHANNELS_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "other", ethtool->channels->other);
+	}
+
+	if (ethtool->channels->combined != NI_ETHTOOL_CHANNELS_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "combined", ethtool->channels->combined);
+	}
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_channels(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	if (!ni_dbus_dict_get_uint32(argument, "tx", &ethtool->channels->tx)) {
+		ethtool->channels->tx = NI_ETHTOOL_CHANNELS_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "rx", &ethtool->channels->rx)) {
+		ethtool->channels->rx = NI_ETHTOOL_CHANNELS_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "other", &ethtool->channels->other)) {
+		ethtool->channels->other = NI_ETHTOOL_CHANNELS_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "combined", &ethtool->channels->combined)) {
+		ethtool->channels->combined = NI_ETHTOOL_CHANNELS_DEFAULT;
+	}
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_ring(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (ethtool->ring->supported == NI_TRISTATE_DISABLE)
+		return FALSE;
+
+	if (ethtool->ring->tx != NI_ETHTOOL_RING_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "tx", ethtool->ring->tx);
+	}
+
+	if (ethtool->ring->rx != NI_ETHTOOL_RING_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "rx", ethtool->ring->rx);
+	}
+
+	if (ethtool->ring->rx_jumbo != NI_ETHTOOL_RING_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "rx-jumbo", ethtool->ring->rx_jumbo);
+	}
+
+	if (ethtool->ring->rx_mini != NI_ETHTOOL_RING_DEFAULT) {
+		ni_dbus_dict_add_int32(result, "rx-mini", ethtool->ring->rx_mini);
+	}
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_ring(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	if (!ni_dbus_dict_get_uint32(argument, "tx", &ethtool->ring->tx)) {
+		ethtool->ring->tx = NI_ETHTOOL_RING_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "rx", &ethtool->ring->rx)) {
+		ethtool->ring->rx = NI_ETHTOOL_RING_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "rx-jumbo", &ethtool->ring->rx_jumbo)) {
+		ethtool->ring->rx_jumbo = NI_ETHTOOL_RING_DEFAULT;
+	}
+
+	if (!ni_dbus_dict_get_uint32(argument, "rx-mini", &ethtool->ring->rx_mini)) {
+		ethtool->ring->rx_mini = NI_ETHTOOL_RING_DEFAULT;
+	}
+
+	return TRUE;
+}
 
 /*
  * ethtool service properties
@@ -535,6 +890,21 @@ static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
 	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex,      RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, offload,     features,    RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
+	__NI_DBUS_PROPERTY(
+			NI_DBUS_DICT_SIGNATURE,
+			eee, ni_objectmodel_ethtool, RO),
+	__NI_DBUS_PROPERTY(
+			NI_DBUS_DICT_SIGNATURE,
+			ring, ni_objectmodel_ethtool, RO),
+	__NI_DBUS_PROPERTY(
+			NI_DBUS_DICT_SIGNATURE,
+			coalesce, ni_objectmodel_ethtool, RO),
+	__NI_DBUS_PROPERTY(
+			NI_DBUS_DICT_SIGNATURE,
+			channels, ni_objectmodel_ethtool, RO),
+
+
+
 	{ NULL }
 };
 
