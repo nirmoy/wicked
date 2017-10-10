@@ -26,6 +26,9 @@
 
 #include <wicked/types.h>
 
+/*
+ * driver-info
+ */
 typedef struct ni_ethtool_driver_info {
 	char *			driver;
 	char *			version;
@@ -41,8 +44,10 @@ typedef struct ni_ethtool_driver_info {
 	} supports;
 } ni_ethtool_driver_info_t;
 
-#define NI_ETHTOOL_SPEED_UNKNOWN	-1U
 
+/*
+ * link-settings
+ */
 typedef enum {
 	NI_ETHTOOL_DUPLEX_HALF,
 	NI_ETHTOOL_DUPLEX_FULL,
@@ -60,6 +65,8 @@ typedef enum {
 	NI_ETHTOOL_PORT_OTHER		= 0xff
 } ni_ethtool_port_type_t;
 
+#define NI_ETHTOOL_SPEED_UNKNOWN	-1U
+
 typedef struct ni_ethtool_link_settings {
 	ni_tristate_t			autoneg;
 	unsigned int			speed;
@@ -67,12 +74,30 @@ typedef struct ni_ethtool_link_settings {
 	uint8_t				port;
 } ni_ethtool_link_settings_t;
 
-typedef struct ni_ethtool_pause {
-	ni_tristate_t			autoneg;
-	ni_tristate_t			rx;
-	ni_tristate_t			tx;
-} ni_ethtool_pause_t;
 
+/*
+ * offload and other features
+ */
+typedef enum {
+	NI_ETHTOOL_FEATURE_OFF,
+	NI_ETHTOOL_FEATURE_ON,
+	NI_ETHTOOL_FEATURE_REQUESTED,
+	NI_ETHTOOL_FEATURE_DEFAULT	= -1U,
+} ni_ethtool_feature_value_t;
+
+typedef struct ni_ethtool_feature {
+	ni_intmap_t			map;
+	ni_ethtool_feature_value_t	value;
+	unsigned int			index;
+} ni_ethtool_feature_t;
+
+typedef struct ni_ethtool_features {
+	unsigned int			total;
+	unsigned int			count;
+	ni_ethtool_feature_t **		features;
+} ni_ethtool_features_t;
+
+/* TODO: get rid of this struct */
 typedef struct ni_ethtool_offload {
 	ni_tristate_t	rx_csum;
 	ni_tristate_t	tx_csum;
@@ -88,28 +113,10 @@ typedef struct ni_ethtool_offload {
 	ni_tristate_t	rxhash;
 } ni_ethtool_offload_t;
 
-#define NI_ETHTOOL_EEE_DEFAULT		-1U
 
-typedef struct ni_ethtool_eee {
-	ni_tristate_t	supported;
-
-	struct {
-		ni_tristate_t	enabled;
-		ni_tristate_t	active;
-	} status;
-	struct {
-		unsigned int	supported;
-		unsigned int	advertised;
-		unsigned int	lp_advertised;
-	} speed;
-	struct {
-		ni_tristate_t	enabled;
-		unsigned int	timer;
-	} tx_lpi;
-} ni_ethtool_eee_t;
-
-#define NI_ETHTOOL_CHANNELS_DEFAULT		-1U
-
+/*
+ * channels
+ */
 typedef struct ni_ethtool_channels {
 	ni_tristate_t	supported;
 	unsigned int	tx;
@@ -118,18 +125,12 @@ typedef struct ni_ethtool_channels {
 	unsigned int	combined;
 } ni_ethtool_channels_t;
 
-#define NI_ETHTOOL_RING_DEFAULT		-1U
+#define NI_ETHTOOL_CHANNELS_DEFAULT		-1U
 
-typedef struct ni_ethtool_ring {
-	ni_tristate_t	supported;
-	unsigned int	tx;
-	unsigned int	rx;
-	unsigned int	rx_jumbo;
-	unsigned int	rx_mini;
-} ni_ethtool_ring_t;
 
-#define NI_ETHTOOL_COALESCE_DEFAULT		-1U
-
+/*
+ * coalesce
+ */
 typedef struct ni_ethtool_coalesce {
 	ni_tristate_t	supported;
 
@@ -163,17 +164,75 @@ typedef struct ni_ethtool_coalesce {
 	unsigned int	tx_frames_high;
 } ni_ethtool_coalesce_t;
 
+#define NI_ETHTOOL_COALESCE_DEFAULT		-1U
+
+
+/*
+ * pause
+ */
+typedef struct ni_ethtool_pause {
+	ni_tristate_t			autoneg;
+	ni_tristate_t			rx;
+	ni_tristate_t			tx;
+} ni_ethtool_pause_t;
+
+
+/*
+ * ring
+ */
+typedef struct ni_ethtool_ring {
+	ni_tristate_t	supported;
+	unsigned int	tx;
+	unsigned int	rx;
+	unsigned int	rx_jumbo;
+	unsigned int	rx_mini;
+} ni_ethtool_ring_t;
+
+#define NI_ETHTOOL_RING_DEFAULT			-1U
+
+
+/*
+ * eee
+ */
+typedef struct ni_ethtool_eee {
+	ni_tristate_t	supported;
+
+	struct {
+		ni_tristate_t	enabled;
+		ni_tristate_t	active;
+	} status;
+	struct {
+		unsigned int	supported;
+		unsigned int	advertised;
+		unsigned int	lp_advertised;
+	} speed;
+	struct {
+		ni_tristate_t	enabled;
+		unsigned int	timer;
+	} tx_lpi;
+} ni_ethtool_eee_t;
+
+#define NI_ETHTOOL_EEE_DEFAULT		-1U
+
+
+/*
+ * device ethtool structure
+ */
 struct ni_ethtool {
 	unsigned int			supported;
 
+	/* read-only info */
 	ni_ethtool_driver_info_t *	driver_info;
+
+	/* configurable   */
 	ni_ethtool_link_settings_t *	link_settings;
-	ni_ethtool_pause_t *		pause;
+	ni_ethtool_features_t *		features;
 	ni_ethtool_offload_t *		offload;
-	ni_ethtool_eee_t *		eee;
-	ni_ethtool_ring_t *		ring;
-	ni_ethtool_coalesce_t *		coalesce;
 	ni_ethtool_channels_t *		channels;
+	ni_ethtool_coalesce_t *		coalesce;
+	ni_ethtool_pause_t *		pause;
+	ni_ethtool_ring_t *		ring;
+	ni_ethtool_eee_t *		eee;
 };
 
 extern ni_ethtool_t *			ni_ethtool_new(void);
@@ -183,11 +242,15 @@ extern void				ni_ethtool_free(ni_ethtool_t *);
 extern ni_bool_t			ni_ethtool_refresh(ni_netdev_t *);
 extern int				ni_ethtool_setup(ni_netdev_t *, const ni_ethtool_t *);
 
+
 extern ni_ethtool_driver_info_t *	ni_ethtool_driver_info_new(void);
 extern void				ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *);
 
 extern ni_ethtool_link_settings_t *	ni_ethtool_link_settings_new(void);
 extern void				ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *);
+
+extern ni_ethtool_features_t *		ni_ethtool_features_new(void);
+extern void				ni_ethtool_features_free(ni_ethtool_features_t *);
 
 extern ni_ethtool_pause_t *		ni_ethtool_pause_new(void);
 extern void				ni_ethtool_pause_free(ni_ethtool_pause_t *);
