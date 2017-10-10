@@ -820,7 +820,7 @@ ni_ethtool_get_features_init(const char *ifname, ni_ethtool_t *ethtool)
 }
 
 static inline int
-ni_ethtool_get_features_update(const char *ifname, ni_ethtool_t *features)
+ni_ethtool_get_features_update(const char *ifname, ni_ethtool_t *ethtool)
 {
 	struct ethtool_gfeatures *gfeatures;
 	ni_ethtool_features_t *features;
