@@ -31,6 +31,7 @@
 #include <wicked/system.h>
 #include <wicked/dbus-errors.h>
 #include <wicked/dbus-service.h>
+#include "dbus-common.h"
 #include "model.h"
 #include "debug.h"
 
@@ -383,6 +384,75 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 }
 
 /*
+ * get/set ethtool.offload and other features
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_get_features(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	unsigned int i;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (!ethtool->features || !ethtool->features->count)
+		return FALSE;
+
+	for (i = 0; i < ethtool->features->count; ++i) {
+		const ni_ethtool_feature_t *feature;
+
+		if (!(feature = ethtool->features->features[i]))
+			continue;
+
+		if (feature->value == NI_ETHTOOL_FEATURE_DEFAULT)
+			continue;
+
+		/* int32 for backward compatibility */
+		ni_dbus_dict_add_int32(result, feature->map.name, feature->value);
+	}
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_features(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	const ni_dbus_dict_entry_t *entry;
+	ni_ethtool_t *ethtool;
+	unsigned int i;
+	int32_t value;
+
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	ni_ethtool_features_free(ethtool->features);
+	if (!(ethtool->features = ni_ethtool_features_new()))
+		return FALSE;
+
+	for (i = 0; i < argument->array.len; ++i) {
+		if (!(entry = &argument->dict_array_value[i]))
+			continue;
+
+		/* int32 for backward compatibility */
+		ni_dbus_variant_get_int32(&entry->datum, &value);
+		if (value < 0)
+			continue;
+
+		value &= NI_ETHTOOL_FEATURE_ON|NI_ETHTOOL_FEATURE_REQUESTED;
+		ni_ethtool_features_set(ethtool->features, entry->key, value);
+	}
+	return TRUE;
+}
+
+/*
  * get/set ethtool.pause properties
  */
 static dbus_bool_t
@@ -463,6 +533,7 @@ static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
 	ETHTOOL_UINT_PROPERTY(ethtool, link-speed,  link_speed,  RO),
 	ETHTOOL_UINT_PROPERTY(ethtool, port-type,   port_type,   RO),
 	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex,      RO),
+	ETHTOOL_DICT_PROPERTY(ethtool, offload,     features,    RO),
 	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
 	{ NULL }
 };

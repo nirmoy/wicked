@@ -251,6 +251,8 @@ extern void				ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *);
 
 extern ni_ethtool_features_t *		ni_ethtool_features_new(void);
 extern void				ni_ethtool_features_free(ni_ethtool_features_t *);
+extern ni_ethtool_feature_t *		ni_ethtool_features_set(ni_ethtool_features_t *,
+					const char *, ni_ethtool_feature_value_t);
 
 extern ni_ethtool_pause_t *		ni_ethtool_pause_new(void);
 extern void				ni_ethtool_pause_free(ni_ethtool_pause_t *);
