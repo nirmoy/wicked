@@ -673,7 +673,6 @@ ni_ethtool_get_feature_count(const char *ifname)
 	else
 	if (sset_info.hdr.sset_mask == (1ULL << ETH_SS_FEATURES))
 		count = sset_info.hdr.data[0];
-
 	return count;
 }
 
@@ -742,27 +741,38 @@ ni_ethtool_get_feature_values(const char *ifname, unsigned int count)
 	return gfeatures;
 }
 
-static int
-ni_ethtool_get_features_init(const char *ifname, ni_ethtool_features_t *features)
+static inline int
+ni_ethtool_get_features_init(const char *ifname, ni_ethtool_t *ethtool)
 {
 	struct ethtool_gfeatures *gfeatures;
 	struct ethtool_gstrings *gstrings;
+	ni_ethtool_features_t *features;
 	ni_ethtool_feature_t *feature;
 	unsigned int i;
 
-	ni_assert(features != NULL);
-	features->total = ni_ethtool_get_feature_count(ifname);
-	if (features->total == 0 || features->total == -1U)
+	if (!ethtool || !(features = ethtool->features))
 		return -1;
+
+	features->total = ni_ethtool_get_feature_count(ifname);
+	if (features->total == -1U || features->total == 0) {
+		if (errno == EOPNOTSUPP)
+			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_FEATURES, FALSE);
+		features->total = 0;
+		return -1;
+	}
 
 	gstrings = ni_ethtool_get_feature_strings(ifname, features->total);
 	if (!gstrings || gstrings->len != features->total) {
+		if (errno == EOPNOTSUPP)
+			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_FEATURES, FALSE);
 		free(gstrings);
 		return -1;
 	}
 
 	gfeatures = ni_ethtool_get_feature_values(ifname, features->total);
 	if (!gfeatures || gfeatures->size != ni_ethtool_get_feature_blocks(features->total)) {
+		if (errno == EOPNOTSUPP)
+			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_FEATURES, FALSE);
 		free(gstrings);
 		free(gfeatures);
 		return -1;
@@ -809,20 +819,21 @@ ni_ethtool_get_features_init(const char *ifname, ni_ethtool_features_t *features
 	return 0;
 }
 
-static int
-ni_ethtool_get_features_update(const char *ifname, ni_ethtool_features_t *features)
+static inline int
+ni_ethtool_get_features_update(const char *ifname, ni_ethtool_t *features)
 {
 	struct ethtool_gfeatures *gfeatures;
+	ni_ethtool_features_t *features;
 	ni_ethtool_feature_t *feature;
 	unsigned int i;
 
-	ni_assert(features != NULL);
-
-	if (!features || !features->total || !features->count)
+	if (!ethtool || !(features = ethtool->features) || !features->total)
 		return -1;
 
 	gfeatures = ni_ethtool_get_feature_values(ifname, features->total);
 	if (!gfeatures || gfeatures->size != ni_ethtool_get_feature_blocks(features->total)) {
+		if (errno == EOPNOTSUPP)
+			ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_FEATURES, FALSE);
 		free(gfeatures);
 		return -1;
 	}
@@ -864,12 +875,13 @@ ni_ethtool_get_features(const char *ifname, ni_ethtool_t *ethtool)
 		return -1;
 
 	if (ethtool->features && ethtool->features->total)
-		return ni_ethtool_get_features_update(ifname, ethtool->features);
+		return ni_ethtool_get_features_update(ifname, ethtool);
 
-	if (!(ethtool->features = ni_ethtool_features_new()))
-		return -1;
+	ni_ethtool_features_free(ethtool->features);
+	if ((ethtool->features = ni_ethtool_features_new()))
+		return ni_ethtool_get_features_init(ifname, ethtool);
 
-	return ni_ethtool_get_features_init(ifname, ethtool->features);
+	return -1;
 }
 
 static int
