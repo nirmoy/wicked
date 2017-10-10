@@ -119,6 +119,7 @@ typedef struct ni_ethtool_offload {
  */
 typedef struct ni_ethtool_channels {
 	ni_tristate_t	supported;
+
 	unsigned int	tx;
 	unsigned int	rx;
 	unsigned int	other;
@@ -182,6 +183,7 @@ typedef struct ni_ethtool_pause {
  */
 typedef struct ni_ethtool_ring {
 	ni_tristate_t	supported;
+
 	unsigned int	tx;
 	unsigned int	rx;
 	unsigned int	rx_jumbo;
@@ -254,7 +256,24 @@ extern void				ni_ethtool_features_free(ni_ethtool_features_t *);
 extern ni_ethtool_feature_t *		ni_ethtool_features_set(ni_ethtool_features_t *,
 					const char *, ni_ethtool_feature_value_t);
 
+extern ni_ethtool_channels_t *		ni_ethtool_channels_new(void);
+extern void				ni_ethtool_channels_init(ni_ethtool_channels_t *);
+extern void				ni_ethtool_channels_free(ni_ethtool_channels_t *);
+
+extern ni_ethtool_coalesce_t *		ni_ethtool_coalesce_new(void);
+extern void				ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *);
+extern void				ni_ethtool_coalesce_free(ni_ethtool_coalesce_t *);
+
 extern ni_ethtool_pause_t *		ni_ethtool_pause_new(void);
+extern void				ni_ethtool_pause_init(ni_ethtool_pause_t *);
 extern void				ni_ethtool_pause_free(ni_ethtool_pause_t *);
+
+extern ni_ethtool_ring_t *		ni_ethtool_ring_new(void);
+extern void				ni_ethtool_ring_init(ni_ethtool_ring_t *);
+extern void				ni_ethtool_ring_free(ni_ethtool_ring_t *);
+
+extern ni_ethtool_eee_t *		ni_ethtool_eee_new(void);
+extern void				ni_ethtool_eee_init(ni_ethtool_eee_t *);
+extern void				ni_ethtool_eee_free(ni_ethtool_eee_t *);
 
 #endif /* WICKED_ETHTOOL_H */

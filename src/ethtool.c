@@ -879,6 +879,93 @@ ni_ethtool_set_features(const char *ifname, ni_ethtool_t *ethtool,
 	return -1;
 }
 
+/*
+ * channels (GCHANNELS,SCHANNELS)
+ */
+void
+ni_ethtool_channels_free(ni_ethtool_channels_t *channels)
+{
+	free(channels);
+}
+
+void
+ni_ethtool_channels_init(ni_ethtool_channels_t *channels)
+{
+	if (channels) {
+		channels->supported = NI_TRISTATE_DEFAULT;
+
+		channels->tx = NI_ETHTOOL_CHANNELS_DEFAULT;
+		channels->rx = NI_ETHTOOL_CHANNELS_DEFAULT;
+		channels->other = NI_ETHTOOL_CHANNELS_DEFAULT;
+		channels->combined = NI_ETHTOOL_CHANNELS_DEFAULT;
+	}
+}
+
+ni_ethtool_channels_t *
+ni_ethtool_channels_new(void)
+{
+	ni_ethtool_channels_t *channels;
+
+	channels = calloc(1, sizeof(*channels));
+	ni_ethtool_channels_init(channels);
+	return channels;
+}
+
+/*
+ * coalesce (GCOALESCE,SCOALESCE)
+ */
+void
+ni_ethtool_coalesce_free(ni_ethtool_coalesce_t *coalesce)
+{
+	free(coalesce);
+}
+
+void
+ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce)
+{
+	if (coalesce) {
+		coalesce->supported = NI_TRISTATE_DEFAULT;
+
+		coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
+		coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
+
+		coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
+
+		coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
+		coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
+	}
+}
+
+ni_ethtool_coalesce_t *
+ni_ethtool_coalesce_new(void)
+{
+	ni_ethtool_coalesce_t *coalesce;
+
+	coalesce = calloc(1, sizeof(*coalesce));
+	ni_ethtool_coalesce_init(coalesce);
+	return coalesce;
+}
 
 /*
  * pause (GPAUSEPARAM,SPAUSEPARAM)
@@ -889,17 +976,23 @@ ni_ethtool_pause_free(ni_ethtool_pause_t *pause)
 	free(pause);
 }
 
+void
+ni_ethtool_pause_init(ni_ethtool_pause_t *pause)
+{
+	if (pause) {
+		pause->autoneg = NI_TRISTATE_DEFAULT;
+		pause->rx      = NI_TRISTATE_DEFAULT;
+		pause->tx      = NI_TRISTATE_DEFAULT;
+	}
+}
+
 ni_ethtool_pause_t *
 ni_ethtool_pause_new(void)
 {
 	ni_ethtool_pause_t *pause;
 
 	pause = calloc(1, sizeof(*pause));
-	if (pause) {
-		pause->autoneg = NI_TRISTATE_DEFAULT;
-		pause->rx      = NI_TRISTATE_DEFAULT;
-		pause->tx      = NI_TRISTATE_DEFAULT;
-	}
+	ni_ethtool_pause_init(pause);
 	return pause;
 }
 
@@ -973,6 +1066,77 @@ ni_ethtool_set_pause(const char *ifname, ni_ethtool_t *ethtool, const ni_ethtool
 				!(ret < 0 && errno == EOPNOTSUPP));
 	return ret;
 }
+
+
+/*
+ * ring (GRINGPARAM,SRINGPARAM)
+ */
+void
+ni_ethtool_ring_free(ni_ethtool_ring_t *ring)
+{
+	free(ring);
+}
+
+void
+ni_ethtool_ring_init(ni_ethtool_ring_t *ring)
+{
+	if (ring) {
+		ring->supported = NI_TRISTATE_DEFAULT;
+
+		ring->tx	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx_mini	= NI_ETHTOOL_RING_DEFAULT;
+		ring->rx_jumbo	= NI_ETHTOOL_RING_DEFAULT;
+	}
+}
+
+ni_ethtool_ring_t *
+ni_ethtool_ring_new(void)
+{
+	ni_ethtool_ring_t *ring;
+
+	ring = calloc(1, sizeof(*ring));
+	ni_ethtool_ring_init(ring);
+	return ring;
+}
+
+/*
+ * eee (GEEE,SEEE)
+ */
+void
+ni_ethtool_eee_free(ni_ethtool_eee_t *eee)
+{
+	free(eee);
+}
+
+void
+ni_ethtool_eee_init(ni_ethtool_eee_t *eee)
+{
+	if (eee)  {
+		eee->supported = NI_TRISTATE_DEFAULT;
+
+		eee->status.enabled = NI_TRISTATE_DEFAULT;
+		eee->status.active = NI_TRISTATE_DEFAULT;
+
+		eee->speed.supported = NI_ETHTOOL_EEE_DEFAULT;
+		eee->speed.advertised = NI_ETHTOOL_EEE_DEFAULT;
+		eee->speed.lp_advertised = NI_ETHTOOL_EEE_DEFAULT;
+
+		eee->tx_lpi.enabled = NI_TRISTATE_DEFAULT;
+		eee->tx_lpi.timer = NI_ETHTOOL_EEE_DEFAULT;
+	}
+}
+
+ni_ethtool_eee_t *
+ni_ethtool_eee_new(void)
+{
+	ni_ethtool_eee_t *eee;
+
+	eee = calloc(1, sizeof(*eee));
+	ni_ethtool_eee_init(eee);
+	return eee;
+}
+
 
 /*
  * main system refresh and setup functions

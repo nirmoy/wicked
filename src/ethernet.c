@@ -56,10 +56,6 @@ static void	__ni_system_ethernet_get(const char *, ni_ethernet_t *);
 static void	__ni_system_ethernet_set(const char *, ni_ethernet_t *);
 static int	__ni_ethtool_get_gset(const char *, ni_ethernet_t *);
 static void	ni_ethtool_offload_init(ni_ethtool_offload_t *);
-static void	ni_ethtool_eee_init(ni_ethtool_eee_t *);
-static void	ni_ethtool_ring_init(ni_ethtool_ring_t *);
-static void	ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce);
-static void	ni_ethtool_channels_init(ni_ethtool_channels_t *);
 
 /*
  * Allocate ethernet struct
@@ -741,43 +737,6 @@ ni_ethtool_validate_uint_param(unsigned int *curr, unsigned int wanted,
 	return TRUE;
 }
 
-static void
-ni_ethtool_coalesce_init(ni_ethtool_coalesce_t *coalesce)
-{
-	if (coalesce) {
-		coalesce->supported = NI_TRISTATE_DEFAULT;
-
-		coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
-		coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
-
-		coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
-
-		coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-
-		coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
-
-		coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
-
-		coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
-
-		coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
-		coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-}
-
 static int
 ni_ethtool_get_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
 {
@@ -969,24 +928,6 @@ ni_ethtool_set_coalesce(const char *ifname, ni_ethtool_coalesce_t *coalesce)
 	return 0;
 }
 
-static void
-ni_ethtool_eee_init(ni_ethtool_eee_t *eee)
-{
-	if (eee) {
-		eee->supported = NI_TRISTATE_DEFAULT;
-
-		eee->status.enabled = NI_TRISTATE_DEFAULT;
-		eee->status.active = NI_TRISTATE_DEFAULT;
-
-		eee->speed.supported = NI_ETHTOOL_EEE_DEFAULT;
-		eee->speed.advertised = NI_ETHTOOL_EEE_DEFAULT;
-		eee->speed.lp_advertised = NI_ETHTOOL_EEE_DEFAULT;
-
-		eee->tx_lpi.enabled = NI_TRISTATE_DEFAULT;
-		eee->tx_lpi.timer = NI_ETHTOOL_EEE_DEFAULT;
-	}
-}
-
 static int
 ni_ethtool_get_eee(const char *ifname, ni_ethtool_eee_t *eee)
 {
@@ -1053,18 +994,6 @@ ni_ethtool_set_eee(const char *ifname, ni_ethtool_eee_t *eee)
 	return 0;
 }
 
-static void
-ni_ethtool_ring_init(ni_ethtool_ring_t *ring)
-{
-	if (ring) {
-		ring->supported = NI_TRISTATE_DEFAULT;
-		ring->tx	= NI_ETHTOOL_RING_DEFAULT;
-		ring->rx	= NI_ETHTOOL_RING_DEFAULT;
-		ring->rx_mini	= NI_ETHTOOL_RING_DEFAULT;
-		ring->rx_jumbo	= NI_ETHTOOL_RING_DEFAULT;
-	}
-}
-
 static int
 ni_ethtool_get_ring(const char *ifname, ni_ethtool_ring_t *ring)
 {
@@ -1128,18 +1057,6 @@ ni_ethtool_set_ring(const char *ifname, ni_ethtool_ring_t *ring)
 				&tmp.rx_mini_pending, ring->rx_mini);
 
 	return 0;
-}
-
-	static void
-ni_ethtool_channels_init(ni_ethtool_channels_t *channels)
-{
-	if (channels) {
-		channels->supported = NI_TRISTATE_DEFAULT;
-		channels->tx	= NI_ETHTOOL_CHANNELS_DEFAULT;
-		channels->rx	= NI_ETHTOOL_CHANNELS_DEFAULT;
-		channels->other	= NI_ETHTOOL_CHANNELS_DEFAULT;
-		channels->combined	= NI_ETHTOOL_CHANNELS_DEFAULT;
-	}
 }
 
 static int

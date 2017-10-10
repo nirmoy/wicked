@@ -114,172 +114,6 @@ ni_objectmodel_ethtool_write_handle(const ni_dbus_object_t *object,
 	return ni_objectmodel_ethtool_handle(object, TRUE, error);
 }
 
-/*
- * get/set ethtool link-setting properties
- */
-static dbus_bool_t
-ni_objectmodel_ethtool_get_autoneg(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-	const ni_ethtool_link_settings_t *link;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-	if (!(link = ethtool->link_settings) || !ni_tristate_is_set(link->autoneg))
-		return FALSE;
-
-	ni_dbus_variant_set_bool(result, ni_tristate_is_enabled(link->autoneg));
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_autoneg(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-	ni_ethtool_link_settings_t *link;
-	dbus_bool_t bv;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
-		return FALSE;
-	
-	link = ethtool->link_settings;
-	if (ni_dbus_variant_get_bool(argument, &bv))
-		ni_tristate_set(&link->autoneg, bv);
-	else
-		link->autoneg = NI_TRISTATE_DISABLE;
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_get_link_speed(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-	const ni_ethtool_link_settings_t *link;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-	if (!(link = ethtool->link_settings) || !link->speed)
-		return FALSE;
-
-	ni_dbus_variant_set_uint32(result, link->speed);
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_link_speed(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-	ni_ethtool_link_settings_t *link;
-	uint32_t u32;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
-		return FALSE;
-	
-	link = ethtool->link_settings;
-	if (ni_dbus_variant_get_uint32(argument, &u32))
-		link->speed = u32;
-	else
-		link->speed = 0;
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_get_port_type(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-	const ni_ethtool_link_settings_t *link;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-	if (!(link = ethtool->link_settings) || link->port != 0xff)
-		return FALSE;
-
-	ni_dbus_variant_set_uint32(result, link->port);
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_port_type(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-	ni_ethtool_link_settings_t *link;
-	uint32_t u32;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
-		return FALSE;
-	
-	link = ethtool->link_settings;
-	if (ni_dbus_variant_get_uint32(argument, &u32))
-		link->port = u32;
-	else
-		link->port = 0xff;
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_get_duplex(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-	const ni_ethtool_link_settings_t *link;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-	if (!(link = ethtool->link_settings) || link->duplex != 0xff)
-		return FALSE;
-
-	ni_dbus_variant_set_uint32(result, link->duplex);
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_duplex(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-	ni_ethtool_link_settings_t *link;
-	uint32_t u32;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
-		return FALSE;
-	
-	link = ethtool->link_settings;
-	if (ni_dbus_variant_get_uint32(argument, &u32))
-		link->duplex = u32;
-	else
-		link->duplex = 0xff;
-	return TRUE;
-}
 
 /*
  * get/set ethtool.driver-info properties
@@ -383,6 +217,174 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 	return TRUE;
 }
 
+
+/*
+ * get/set ethtool link-setting as separate properties
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_get_autoneg(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	const ni_ethtool_link_settings_t *link;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings) || !ni_tristate_is_set(link->autoneg))
+		return FALSE;
+
+	ni_dbus_variant_set_bool(result, ni_tristate_is_enabled(link->autoneg));
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_autoneg(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+	ni_ethtool_link_settings_t *link;
+	dbus_bool_t bv;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+		return FALSE;
+	
+	link = ethtool->link_settings;
+	if (ni_dbus_variant_get_bool(argument, &bv))
+		ni_tristate_set(&link->autoneg, bv);
+	else
+		link->autoneg = NI_TRISTATE_DISABLE;
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_link_speed(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	const ni_ethtool_link_settings_t *link;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings) || link->speed == NI_ETHTOOL_SPEED_UNKNOWN)
+		return FALSE;
+
+	ni_dbus_variant_set_uint32(result, link->speed);
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_link_speed(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+	ni_ethtool_link_settings_t *link;
+	uint32_t u32;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+		return FALSE;
+	
+	link = ethtool->link_settings;
+	if (ni_dbus_variant_get_uint32(argument, &u32))
+		link->speed = u32;
+	else
+		link->speed = NI_ETHTOOL_SPEED_UNKNOWN;
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_port_type(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	const ni_ethtool_link_settings_t *link;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings) || link->port == NI_ETHTOOL_PORT_OTHER)
+		return FALSE;
+
+	ni_dbus_variant_set_uint32(result, link->port);
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_port_type(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+	ni_ethtool_link_settings_t *link;
+	uint32_t u32;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+		return FALSE;
+	
+	link = ethtool->link_settings;
+	if (ni_dbus_variant_get_uint32(argument, &u32))
+		link->port = u32;
+	else
+		link->port = NI_ETHTOOL_PORT_OTHER;
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_duplex(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+	const ni_ethtool_link_settings_t *link;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings) || link->duplex == NI_ETHTOOL_DUPLEX_UNKNOWN)
+		return FALSE;
+
+	ni_dbus_variant_set_uint32(result, link->duplex);
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_duplex(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+	ni_ethtool_link_settings_t *link;
+	uint32_t u32;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+		return FALSE;
+	
+	link = ethtool->link_settings;
+	if (ni_dbus_variant_get_uint32(argument, &u32))
+		link->duplex = u32;
+	else
+		link->duplex = NI_ETHTOOL_DUPLEX_UNKNOWN;
+	return TRUE;
+}
+
 /*
  * get/set ethtool.offload and other features
  */
@@ -453,6 +455,194 @@ ni_objectmodel_ethtool_set_features(ni_dbus_object_t *object,
 }
 
 /*
+ * get/set ethtool.channels properties
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_get_channels(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (!ethtool->channels)
+		return FALSE;
+
+	if (ethtool->channels->tx != NI_ETHTOOL_CHANNELS_DEFAULT)
+		ni_dbus_dict_add_int32(result, "tx", ethtool->channels->tx);
+
+	if (ethtool->channels->rx != NI_ETHTOOL_CHANNELS_DEFAULT)
+		ni_dbus_dict_add_int32(result, "rx", ethtool->channels->rx);
+
+	if (ethtool->channels->other != NI_ETHTOOL_CHANNELS_DEFAULT)
+		ni_dbus_dict_add_int32(result, "other", ethtool->channels->other);
+
+	if (ethtool->channels->combined != NI_ETHTOOL_CHANNELS_DEFAULT)
+		ni_dbus_dict_add_int32(result, "combined", ethtool->channels->combined);
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_channels(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	ni_ethtool_channels_free(ethtool->channels);
+	if (!(ethtool->channels = ni_ethtool_channels_new()))
+		return FALSE;
+
+	ni_dbus_dict_get_uint32(argument, "tx", &ethtool->channels->tx);
+	ni_dbus_dict_get_uint32(argument, "rx", &ethtool->channels->rx);
+	ni_dbus_dict_get_uint32(argument, "other", &ethtool->channels->other);
+	ni_dbus_dict_get_uint32(argument, "combined", &ethtool->channels->combined);
+
+	return TRUE;
+}
+
+/*
+ * get/set ethtool.coalesce properties
+ */
+static dbus_bool_t
+ni_objectmodel_ethtool_get_coalesce(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	const ni_ethtool_t *ethtool;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+
+	if (!ethtool->coalesce)
+		return FALSE;
+
+	if (ethtool->coalesce->adaptive_rx != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "adaptive-rx", ethtool->coalesce->adaptive_rx);
+
+	if (ethtool->coalesce->adaptive_tx != NI_TRISTATE_DEFAULT)
+		ni_dbus_dict_add_int32(result, "adaptive-tx", ethtool->coalesce->adaptive_tx);
+
+	if (ethtool->coalesce->rx_usecs != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-usecs", ethtool->coalesce->rx_usecs);
+
+	if (ethtool->coalesce->rx_frames != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-frames", ethtool->coalesce->rx_frames);
+
+	if (ethtool->coalesce->rx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-usecs-irq", ethtool->coalesce->rx_usecs_irq);
+
+	if (ethtool->coalesce->rx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-frames-irq", ethtool->coalesce->rx_frames_irq);
+
+	if (ethtool->coalesce->tx_usecs != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-usecs", ethtool->coalesce->tx_usecs);
+
+	if (ethtool->coalesce->tx_frames != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-frames", ethtool->coalesce->tx_frames);
+
+	if (ethtool->coalesce->tx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-usecs-irq", ethtool->coalesce->tx_usecs_irq);
+
+	if (ethtool->coalesce->tx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-frames-irq", ethtool->coalesce->tx_frames_irq);
+
+	if (ethtool->coalesce->stats_block_usecs != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "stats-block-usecs", ethtool->coalesce->stats_block_usecs);
+
+	if (ethtool->coalesce->pkt_rate_low != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "pkt-rate-low", ethtool->coalesce->pkt_rate_low);
+
+	if (ethtool->coalesce->rx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-usecs-low", ethtool->coalesce->rx_usecs_low);
+
+	if (ethtool->coalesce->rx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-frames-low", ethtool->coalesce->rx_frames_low);
+
+	if (ethtool->coalesce->tx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-usecs-low", ethtool->coalesce->tx_usecs_low);
+
+	if (ethtool->coalesce->tx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-frames-low", ethtool->coalesce->tx_frames_low);
+
+	if (ethtool->coalesce->pkt_rate_high != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "pkt-rate-high", ethtool->coalesce->pkt_rate_high);
+
+	if (ethtool->coalesce->rx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-usecs-high", ethtool->coalesce->rx_usecs_high);
+
+	if (ethtool->coalesce->rx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "rx-frames-high", ethtool->coalesce->rx_frames_high);
+
+	if (ethtool->coalesce->tx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-usecs-high", ethtool->coalesce->tx_usecs_high);
+
+	if (ethtool->coalesce->tx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "tx-frames-high", ethtool->coalesce->tx_frames_high);
+
+	if (ethtool->coalesce->sample_interval != NI_ETHTOOL_COALESCE_DEFAULT)
+		ni_dbus_dict_add_uint32(result, "sample-interval", ethtool->coalesce->sample_interval);
+
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_coalesce(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_t *ethtool;
+
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	ni_ethtool_coalesce_free(ethtool->coalesce);
+	if (!(ethtool->coalesce = ni_ethtool_coalesce_new()))
+		return FALSE;
+
+	ni_dbus_dict_get_int32(argument, "adaptive-rx", &ethtool->coalesce->adaptive_rx);
+	ni_dbus_dict_get_int32(argument, "adaptive-tx", &ethtool->coalesce->adaptive_tx);
+	ni_dbus_dict_get_uint32(argument, "rx-usecs", &ethtool->coalesce->rx_usecs);
+	ni_dbus_dict_get_uint32(argument, "rx-frames", &ethtool->coalesce->rx_frames);
+	ni_dbus_dict_get_uint32(argument, "rx-usecs-irq", &ethtool->coalesce->rx_usecs_irq);
+	ni_dbus_dict_get_uint32(argument, "rx-frames-irq", &ethtool->coalesce->rx_frames_irq);
+	ni_dbus_dict_get_uint32(argument, "tx-usecs", &ethtool->coalesce->tx_usecs);
+	ni_dbus_dict_get_uint32(argument, "tx-frames", &ethtool->coalesce->tx_frames);
+	ni_dbus_dict_get_uint32(argument, "tx-usecs-irq", &ethtool->coalesce->tx_usecs_irq);
+	ni_dbus_dict_get_uint32(argument, "tx-frames-irq", &ethtool->coalesce->tx_frames_irq);
+	ni_dbus_dict_get_uint32(argument, "stats-block-usecs", &ethtool->coalesce->stats_block_usecs);
+	ni_dbus_dict_get_uint32(argument, "pkt-rate-low", &ethtool->coalesce->pkt_rate_low);
+	ni_dbus_dict_get_uint32(argument, "rx-usecs-low", &ethtool->coalesce->rx_usecs_low);
+	ni_dbus_dict_get_uint32(argument, "rx-frames-low", &ethtool->coalesce->rx_frames_low);
+	ni_dbus_dict_get_uint32(argument, "tx-usecs-low", &ethtool->coalesce->tx_usecs_low);
+	ni_dbus_dict_get_uint32(argument, "tx-frames-low", &ethtool->coalesce->tx_frames_low);
+	ni_dbus_dict_get_uint32(argument, "pkt-rate-high", &ethtool->coalesce->pkt_rate_high);
+	ni_dbus_dict_get_uint32(argument, "rx-usecs-high", &ethtool->coalesce->rx_usecs_high);
+	ni_dbus_dict_get_uint32(argument, "rx-frames-high", &ethtool->coalesce->rx_frames_high);
+	ni_dbus_dict_get_uint32(argument, "tx-usecs-high", &ethtool->coalesce->tx_usecs_high);
+	ni_dbus_dict_get_uint32(argument, "tx-frames-high", &ethtool->coalesce->tx_frames_high);
+	ni_dbus_dict_get_uint32(argument, "sample-interval", &ethtool->coalesce->sample_interval);
+
+	return TRUE;
+}
+
+/*
  * get/set ethtool.pause properties
  */
 static dbus_bool_t
@@ -462,20 +652,19 @@ ni_objectmodel_ethtool_get_pause(const ni_dbus_object_t *object,
 		DBusError *error)
 {
 	const ni_ethtool_t *ethtool;
-	const ni_ethtool_pause_t *pause;
 
 	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
 		return FALSE;
 
-	if (!(pause = ethtool->pause))
+	if (!ethtool->pause)
 		return FALSE;
 
-	if (ni_tristate_is_set(pause->autoneg))
-		ni_dbus_dict_add_bool(result, "autoneg", pause->autoneg);
-	if (ni_tristate_is_set(pause->rx))
-		ni_dbus_dict_add_bool(result, "rx",      pause->rx);
-	if (ni_tristate_is_set(pause->tx))
-		ni_dbus_dict_add_bool(result, "tx",      pause->tx);
+	if (ni_tristate_is_set(ethtool->pause->autoneg))
+		ni_dbus_dict_add_bool(result, "autoneg", ethtool->pause->autoneg);
+	if (ni_tristate_is_set(ethtool->pause->rx))
+		ni_dbus_dict_add_bool(result, "rx",      ethtool->pause->rx);
+	if (ni_tristate_is_set(ethtool->pause->tx))
+		ni_dbus_dict_add_bool(result, "tx",      ethtool->pause->tx);
 
 	return TRUE;
 }
@@ -486,7 +675,6 @@ ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
 		const ni_dbus_variant_t *argument,
 		DBusError *error)
 {
-	ni_ethtool_pause_t *pause;
 	ni_ethtool_t *ethtool;
 	dbus_bool_t bv;
 
@@ -500,19 +688,21 @@ ni_objectmodel_ethtool_set_pause(ni_dbus_object_t *object,
 	if (!(ethtool->pause = ni_ethtool_pause_new()))
 		return FALSE;
 
-	pause = ethtool->pause;
 	if (ni_dbus_dict_get_bool(argument, "autoneg", &bv))
-		ni_tristate_set(&pause->autoneg, bv);
+		ni_tristate_set(&ethtool->pause->autoneg, bv);
 	if (ni_dbus_dict_get_bool(argument, "rx", &bv))
-		ni_tristate_set(&pause->rx, bv);
+		ni_tristate_set(&ethtool->pause->rx, bv);
 	if (ni_dbus_dict_get_bool(argument, "tx", &bv))
-		ni_tristate_set(&pause->tx, bv);
+		ni_tristate_set(&ethtool->pause->tx, bv);
 
 	return TRUE;
 }
 
+/*
+ * get/set ethtool.ring properties
+ */
 static dbus_bool_t
-ni_objectmodel_ethtool_get_coalesce(const ni_dbus_object_t *object,
+ni_objectmodel_ethtool_get_ring(const ni_dbus_object_t *object,
 		const ni_dbus_property_t *property,
 		ni_dbus_variant_t *result,
 		DBusError *error)
@@ -522,160 +712,51 @@ ni_objectmodel_ethtool_get_coalesce(const ni_dbus_object_t *object,
 	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
 		return FALSE;
 
-	if (ethtool->coalesce->supported == NI_TRISTATE_DISABLE)
+	if (!ethtool->ring)
 		return FALSE;
 
-	if (ethtool->coalesce->adaptive_rx != NI_TRISTATE_DEFAULT)
-		ni_dbus_dict_add_int32(result, "adaptive-rx", ethtool->coalesce->adaptive_rx);
+	if (ethtool->ring->tx != NI_ETHTOOL_RING_DEFAULT)
+		ni_dbus_dict_add_int32(result, "tx", ethtool->ring->tx);
 
-	if (ethtool->coalesce->adaptive_tx != NI_TRISTATE_DEFAULT)
-		ni_dbus_dict_add_int32(result, "adaptive-tx", ethtool->coalesce->adaptive_tx);
-
-	if (ethtool->coalesce->rx_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-usecs", ethtool->coalesce->rx_usecs);
-	}
-	if (ethtool->coalesce->rx_frames != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-frames", ethtool->coalesce->rx_frames);
-	}
-	if (ethtool->coalesce->rx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-usecs-irq", ethtool->coalesce->rx_usecs_irq);
-	}
-	if (ethtool->coalesce->rx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-frames-irq", ethtool->coalesce->rx_frames_irq);
-	}
-	if (ethtool->coalesce->tx_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-usecs", ethtool->coalesce->tx_usecs);
-	}
-	if (ethtool->coalesce->tx_frames != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-frames", ethtool->coalesce->tx_frames);
-	}
-	if (ethtool->coalesce->tx_usecs_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-usecs-irq", ethtool->coalesce->tx_usecs_irq);
-	}
-	if (ethtool->coalesce->tx_frames_irq != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-frames-irq", ethtool->coalesce->tx_frames_irq);
-	}
-	if (ethtool->coalesce->stats_block_usecs != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "stats-block-usecs", ethtool->coalesce->stats_block_usecs);
-	}
-	if (ethtool->coalesce->pkt_rate_low != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "pkt-rate-low", ethtool->coalesce->pkt_rate_low);
-	}
-	if (ethtool->coalesce->rx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-usecs-low", ethtool->coalesce->rx_usecs_low);
-	}
-	if (ethtool->coalesce->rx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-frames-low", ethtool->coalesce->rx_frames_low);
-	}
-	if (ethtool->coalesce->tx_usecs_low != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-usecs-low", ethtool->coalesce->tx_usecs_low);
-	}
-	if (ethtool->coalesce->tx_frames_low != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-frames-low", ethtool->coalesce->tx_frames_low);
-	}
-	if (ethtool->coalesce->pkt_rate_high != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "pkt-rate-high", ethtool->coalesce->pkt_rate_high);
-	}
-	if (ethtool->coalesce->rx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-usecs-high", ethtool->coalesce->rx_usecs_high);
-	}
-	if (ethtool->coalesce->rx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "rx-frames-high", ethtool->coalesce->rx_frames_high);
-	}
-	if (ethtool->coalesce->tx_usecs_high != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-usecs-high", ethtool->coalesce->tx_usecs_high);
-	}
-	if (ethtool->coalesce->tx_frames_high != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "tx-frames-high", ethtool->coalesce->tx_frames_high);
-	}
-	if (ethtool->coalesce->sample_interval != NI_ETHTOOL_COALESCE_DEFAULT) {
-		ni_dbus_dict_add_uint32(result, "sample-interval", ethtool->coalesce->sample_interval);
-	}
+	if (ethtool->ring->rx != NI_ETHTOOL_RING_DEFAULT)
+		ni_dbus_dict_add_int32(result, "rx", ethtool->ring->rx);
+	if (ethtool->ring->rx_jumbo != NI_ETHTOOL_RING_DEFAULT)
+		ni_dbus_dict_add_int32(result, "rx-jumbo", ethtool->ring->rx_jumbo);
+	if (ethtool->ring->rx_mini != NI_ETHTOOL_RING_DEFAULT)
+		ni_dbus_dict_add_int32(result, "rx-mini", ethtool->ring->rx_mini);
 
 	return TRUE;
 }
 
 static dbus_bool_t
-ni_objectmodel_ethtool_set_coalesce(ni_dbus_object_t *object,
+ni_objectmodel_ethtool_set_ring(ni_dbus_object_t *object,
 		const ni_dbus_property_t *property,
 		const ni_dbus_variant_t *argument,
 		DBusError *error)
 {
 	ni_ethtool_t *ethtool;
 
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
 		return FALSE;
 
-	if (!ni_dbus_dict_get_int32(argument, "adaptive-rx", &ethtool->coalesce->adaptive_rx))
-		ethtool->coalesce->adaptive_rx = NI_TRISTATE_DEFAULT;
+	ni_ethtool_ring_free(ethtool->ring);
+	if (!(ethtool->ring = ni_ethtool_ring_new()))
+		return FALSE;
 
-	if (!ni_dbus_dict_get_int32(argument, "adaptive-tx", &ethtool->coalesce->adaptive_tx))
-		ethtool->coalesce->adaptive_tx = NI_TRISTATE_DEFAULT;
-
-	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs", &ethtool->coalesce->rx_usecs)) {
-		ethtool->coalesce->rx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-frames", &ethtool->coalesce->rx_frames)) {
-		ethtool->coalesce->rx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-irq", &ethtool->coalesce->rx_usecs_irq)) {
-		ethtool->coalesce->rx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-irq", &ethtool->coalesce->rx_frames_irq)) {
-		ethtool->coalesce->rx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs", &ethtool->coalesce->tx_usecs)) {
-		ethtool->coalesce->tx_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-frames", &ethtool->coalesce->tx_frames)) {
-		ethtool->coalesce->tx_frames = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-irq", &ethtool->coalesce->tx_usecs_irq)) {
-		ethtool->coalesce->tx_usecs_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-irq", &ethtool->coalesce->tx_frames_irq)) {
-		ethtool->coalesce->tx_frames_irq = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "stats-block-usecs", &ethtool->coalesce->stats_block_usecs)) {
-		ethtool->coalesce->stats_block_usecs = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "pkt-rate-low", &ethtool->coalesce->pkt_rate_low)) {
-		ethtool->coalesce->pkt_rate_low = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-low", &ethtool->coalesce->rx_usecs_low)) {
-		ethtool->coalesce->rx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-low", &ethtool->coalesce->rx_frames_low)) {
-		ethtool->coalesce->rx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-low", &ethtool->coalesce->tx_usecs_low)) {
-		ethtool->coalesce->tx_usecs_low = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-low", &ethtool->coalesce->tx_frames_low)) {
-		ethtool->coalesce->tx_frames_low = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "pkt-rate-high", &ethtool->coalesce->pkt_rate_high)) {
-		ethtool->coalesce->pkt_rate_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-usecs-high", &ethtool->coalesce->rx_usecs_high)) {
-		ethtool->coalesce->rx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "rx-frames-high", &ethtool->coalesce->rx_frames_high)) {
-		ethtool->coalesce->rx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-usecs-high", &ethtool->coalesce->tx_usecs_high)) {
-		ethtool->coalesce->tx_usecs_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "tx-frames-high", &ethtool->coalesce->tx_frames_high)) {
-		ethtool->coalesce->tx_frames_high = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
-	if (!ni_dbus_dict_get_uint32(argument, "sample-interval", &ethtool->coalesce->sample_interval)) {
-		ethtool->coalesce->sample_interval = NI_ETHTOOL_COALESCE_DEFAULT;
-	}
+	ni_dbus_dict_get_uint32(argument, "tx", &ethtool->ring->tx);
+	ni_dbus_dict_get_uint32(argument, "rx", &ethtool->ring->rx);
+	ni_dbus_dict_get_uint32(argument, "rx-jumbo", &ethtool->ring->rx_jumbo);
+	ni_dbus_dict_get_uint32(argument, "rx-mini", &ethtool->ring->rx_mini);
 
 	return TRUE;
 }
 
+/*
+ * get/set ethtool.eee properties
+ */
 static dbus_bool_t
 ni_objectmodel_ethtool_get_eee(const ni_dbus_object_t *object,
 		const ni_dbus_property_t *property,
@@ -687,7 +768,7 @@ ni_objectmodel_ethtool_get_eee(const ni_dbus_object_t *object,
 	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
 		return FALSE;
 
-	if (ethtool->eee->supported == NI_TRISTATE_DISABLE)
+	if (!ethtool->eee)
 		return FALSE;
 
 	if (ethtool->eee->status.enabled != NI_TRISTATE_DEFAULT)
@@ -718,7 +799,14 @@ ni_objectmodel_ethtool_set_eee(ni_dbus_object_t *object,
 {
 	ni_ethtool_t *ethtool;
 
+	if (!ni_dbus_variant_is_dict(argument))
+		return FALSE;
+
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+
+	ni_ethtool_eee_free(ethtool->eee);
+	if (!(ethtool->eee = ni_ethtool_eee_new()))
 		return FALSE;
 
 	if (!ni_dbus_dict_get_int32(argument, "enabled", &ethtool->eee->status.enabled))
@@ -741,131 +829,6 @@ ni_objectmodel_ethtool_set_eee(ni_dbus_object_t *object,
 	return TRUE;
 }
 
-static dbus_bool_t
-ni_objectmodel_ethtool_get_channels(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-
-	if (ethtool->channels->supported == NI_TRISTATE_DISABLE)
-		return FALSE;
-
-	if (ethtool->channels->tx != NI_ETHTOOL_CHANNELS_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "tx", ethtool->channels->tx);
-	}
-
-	if (ethtool->channels->rx != NI_ETHTOOL_CHANNELS_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "rx", ethtool->channels->rx);
-	}
-
-	if (ethtool->channels->other != NI_ETHTOOL_CHANNELS_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "other", ethtool->channels->other);
-	}
-
-	if (ethtool->channels->combined != NI_ETHTOOL_CHANNELS_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "combined", ethtool->channels->combined);
-	}
-
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_channels(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-
-	if (!ni_dbus_dict_get_uint32(argument, "tx", &ethtool->channels->tx)) {
-		ethtool->channels->tx = NI_ETHTOOL_CHANNELS_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "rx", &ethtool->channels->rx)) {
-		ethtool->channels->rx = NI_ETHTOOL_CHANNELS_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "other", &ethtool->channels->other)) {
-		ethtool->channels->other = NI_ETHTOOL_CHANNELS_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "combined", &ethtool->channels->combined)) {
-		ethtool->channels->combined = NI_ETHTOOL_CHANNELS_DEFAULT;
-	}
-
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_get_ring(const ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		ni_dbus_variant_t *result,
-		DBusError *error)
-{
-	const ni_ethtool_t *ethtool;
-
-	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
-		return FALSE;
-
-	if (ethtool->ring->supported == NI_TRISTATE_DISABLE)
-		return FALSE;
-
-	if (ethtool->ring->tx != NI_ETHTOOL_RING_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "tx", ethtool->ring->tx);
-	}
-
-	if (ethtool->ring->rx != NI_ETHTOOL_RING_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "rx", ethtool->ring->rx);
-	}
-
-	if (ethtool->ring->rx_jumbo != NI_ETHTOOL_RING_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "rx-jumbo", ethtool->ring->rx_jumbo);
-	}
-
-	if (ethtool->ring->rx_mini != NI_ETHTOOL_RING_DEFAULT) {
-		ni_dbus_dict_add_int32(result, "rx-mini", ethtool->ring->rx_mini);
-	}
-
-	return TRUE;
-}
-
-static dbus_bool_t
-ni_objectmodel_ethtool_set_ring(ni_dbus_object_t *object,
-		const ni_dbus_property_t *property,
-		const ni_dbus_variant_t *argument,
-		DBusError *error)
-{
-	ni_ethtool_t *ethtool;
-
-	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
-		return FALSE;
-
-	if (!ni_dbus_dict_get_uint32(argument, "tx", &ethtool->ring->tx)) {
-		ethtool->ring->tx = NI_ETHTOOL_RING_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "rx", &ethtool->ring->rx)) {
-		ethtool->ring->rx = NI_ETHTOOL_RING_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "rx-jumbo", &ethtool->ring->rx_jumbo)) {
-		ethtool->ring->rx_jumbo = NI_ETHTOOL_RING_DEFAULT;
-	}
-
-	if (!ni_dbus_dict_get_uint32(argument, "rx-mini", &ethtool->ring->rx_mini)) {
-		ethtool->ring->rx_mini = NI_ETHTOOL_RING_DEFAULT;
-	}
-
-	return TRUE;
-}
 
 /*
  * ethtool service properties
