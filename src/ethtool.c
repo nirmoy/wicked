@@ -275,6 +275,42 @@ ni_ethtool_link_settings_new(void)
 /*
  * legacy link-settings (GSET,SSET)
  */
+#define ALL_ADVERTISED_MODES			\
+	(ADVERTISED_10baseT_Half |		\
+	 ADVERTISED_10baseT_Full |		\
+	 ADVERTISED_100baseT_Half |		\
+	 ADVERTISED_100baseT_Full |		\
+	 ADVERTISED_1000baseT_Half |		\
+	 ADVERTISED_1000baseT_Full |		\
+	 ADVERTISED_1000baseKX_Full|		\
+	 ADVERTISED_2500baseX_Full |		\
+	 ADVERTISED_10000baseT_Full |		\
+	 ADVERTISED_10000baseKX4_Full |		\
+	 ADVERTISED_10000baseKR_Full |		\
+	 ADVERTISED_10000baseR_FEC |		\
+	 ADVERTISED_20000baseMLD2_Full |	\
+	 ADVERTISED_20000baseKR2_Full |		\
+	 ADVERTISED_40000baseKR4_Full |		\
+	 ADVERTISED_40000baseCR4_Full |		\
+	 ADVERTISED_40000baseSR4_Full |		\
+	 ADVERTISED_40000baseLR4_Full |		\
+	 ADVERTISED_56000baseKR4_Full |		\
+	 ADVERTISED_56000baseCR4_Full |		\
+	 ADVERTISED_56000baseSR4_Full |		\
+	 ADVERTISED_56000baseLR4_Full)
+
+#define ALL_ADVERTISED_FLAGS			\
+	(ADVERTISED_Autoneg |			\
+	 ADVERTISED_TP |			\
+	 ADVERTISED_AUI |			\
+	 ADVERTISED_MII |			\
+	 ADVERTISED_FIBRE |			\
+	 ADVERTISED_BNC |			\
+	 ADVERTISED_Pause |			\
+	 ADVERTISED_Asym_Pause |		\
+	 ADVERTISED_Backplane |			\
+	 ALL_ADVERTISED_MODES)
+
 static int
 ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 {
@@ -285,7 +321,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_t *link;
 	int ret;
 
-	ni_trace("%s(%s) TODO", __func__, ifname);
+	ni_trace("%s(%s)", __func__, ifname);
 
 	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY))
 		return -1;
@@ -312,22 +348,118 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	return 0;
 }
 
+static void
+ni_ethtool_set_legacy_advertising(const char *ifname, struct ethtool_cmd *ecmd)
+{
+	if (!ifname || !ecmd)
+		return;
+
+	ni_trace("%s(%s)", __func__, ifname);
+
+	if (ecmd->speed == SPEED_10 && ecmd->duplex == DUPLEX_HALF)
+		ecmd->advertising = ADVERTISED_10baseT_Half;
+	else if (ecmd->speed == SPEED_10 &&
+		ecmd->duplex == DUPLEX_FULL)
+		ecmd->advertising = ADVERTISED_10baseT_Full;
+	else if (ecmd->speed == SPEED_100 &&
+		ecmd->duplex == DUPLEX_HALF)
+		ecmd->advertising = ADVERTISED_100baseT_Half;
+	else if (ecmd->speed == SPEED_100 &&
+		ecmd->duplex == DUPLEX_FULL)
+		ecmd->advertising = ADVERTISED_100baseT_Full;
+	else if (ecmd->speed == SPEED_1000 &&
+		ecmd->duplex == DUPLEX_HALF)
+		ecmd->advertising = ADVERTISED_1000baseT_Half;
+	else if (ecmd->speed == SPEED_1000 &&
+		ecmd->duplex == DUPLEX_FULL)
+		ecmd->advertising = ADVERTISED_1000baseT_Full;
+	else if (ecmd->speed == SPEED_2500 &&
+		ecmd->duplex == DUPLEX_FULL)
+		ecmd->advertising = ADVERTISED_2500baseX_Full;
+	else if (ecmd->speed == SPEED_10000 &&
+		ecmd->duplex == DUPLEX_FULL)
+		ecmd->advertising = ADVERTISED_10000baseT_Full;
+	else
+		/* auto negotiate without forcing,
+		 * all supported speeds will be assigned below
+		 */
+		ecmd->advertising = 0;
+
+	if (ecmd->autoneg && ecmd->advertising == 0) {
+		/* Auto negotiation enabled, but with
+		 * unspecified speed and duplex: enable all
+		 * supported speeds and duplexes.
+		 */
+		ecmd->advertising = (ecmd->advertising &
+				~ALL_ADVERTISED_MODES) |
+			(ALL_ADVERTISED_MODES &
+				ecmd->supported);
+		/* If driver supports unknown flags, we cannot
+		 * be sure that we enable all link modes.
+		 */
+		if ((ecmd->supported & ALL_ADVERTISED_FLAGS) != ecmd->supported) {
+			ni_error("%s: Driver supports one or more unknown flags",
+				ifname);
+		}
+	} else if (ecmd->advertising > 0) {
+		/* Enable all requested modes. */
+		ecmd->advertising = (ecmd->advertising & ~ALL_ADVERTISED_MODES) |
+			ecmd->advertising;
+	}
+}
+
 static int
 ni_ethtool_set_legacy_settings(const char *ifname, ni_ethtool_t *ethtool,
 		const ni_ethtool_link_settings_t *cfg)
 {
-#if 0
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GSET	= {
+		ETHTOOL_GSET,          "get settings"
+	};
 	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_SSET	= {
 		ETHTOOL_SSET,		"set settings"
 	};
-#endif
-	(void)ifname;
-	(void)ethtool;
-	(void)cfg;
+	struct ethtool_cmd ecmd;
+	int ret;
 
-	ni_trace("%s(%s) TODO", __func__, ifname);
+	if (!cfg)
+		return  1; /* nothing to set */
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY))
+		return -1; /* unsupported    */
 
-	return 0;
+	ni_trace("%s(%s)", __func__, ifname);
+
+	memset(&ecmd, 0, sizeof(ecmd));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &ecmd, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	if (ni_tristate_is_set(cfg->autoneg))
+		ecmd.autoneg = cfg->autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE;
+/*
+	if (ecmd.autoneg == AUTONEG_DISABLE) {
+*/
+		if (cfg->speed && cfg->speed != NI_ETHTOOL_SPEED_UNKNOWN &&
+				ethtool_validate_speed(cfg->speed))
+			ethtool_cmd_speed_set(&ecmd, cfg->speed);
+
+		if (cfg->duplex != NI_ETHTOOL_DUPLEX_UNKNOWN &&
+				ethtool_validate_duplex(cfg->duplex))
+			ecmd.duplex = cfg->duplex;
+
+		if (cfg->port != NI_ETHTOOL_PORT_OTHER)
+			ecmd.port = cfg->port;
+/*
+	}
+*/
+
+	ni_ethtool_set_legacy_advertising(ifname, &ecmd);
+
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_SSET, &ecmd, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	return ret;
 }
 
 /*
@@ -343,10 +475,10 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_t *link;
 	int ret;
 
-	ni_trace("%s(%s)", __func__, ifname);
-
 	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS))
 		return ni_ethtool_get_legacy_settings(ifname, ethtool);
+
+	ni_trace("%s(%s)", __func__, ifname);
 
 	ni_ethtool_link_settings_free(ethtool->link_settings);
 	ethtool->link_settings = NULL;
