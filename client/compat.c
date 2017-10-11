@@ -31,6 +31,7 @@
 #include <wicked/addrconf.h>
 #include <wicked/route.h>
 #include <wicked/ethernet.h>
+#include <wicked/ethtool.h>
 #include <wicked/infiniband.h>
 #include <wicked/bonding.h>
 #include <wicked/ppp.h>
@@ -221,40 +222,9 @@ __ni_compat_optional_tristate(const char *name, xml_node_t *node, ni_tristate_t 
 	}
 }
 
-static void
-__ni_compat_generate_eth_offload_node(xml_node_t *parent, const ni_ethtool_offload_t *offload)
-{
-	xml_node_t *node;
-
-	if (!parent || !offload)
-		return;
-
-	/* generate offload and other information */
-	node = xml_node_new("offload", NULL);
-
-	__ni_compat_optional_tristate("rx-csum", node, offload->rx_csum);
-	__ni_compat_optional_tristate("tx-csum", node, offload->tx_csum);
-	__ni_compat_optional_tristate("scatter-gather", node, offload->scatter_gather);
-	__ni_compat_optional_tristate("tso", node, offload->tso);
-	__ni_compat_optional_tristate("ufo", node, offload->ufo);
-	__ni_compat_optional_tristate("gso", node, offload->gso);
-	__ni_compat_optional_tristate("gro", node, offload->gro);
-	__ni_compat_optional_tristate("lro", node, offload->lro);
-	__ni_compat_optional_tristate("rxvlan", node, offload->rxvlan);
-	__ni_compat_optional_tristate("txvlan", node, offload->txvlan);
-	__ni_compat_optional_tristate("ntuple", node, offload->ntuple);
-	__ni_compat_optional_tristate("rxhash", node, offload->rxhash);
-
-	if (node->children)
-		xml_node_add_child(parent, node);
-	else
-		xml_node_free(node);
-
-}
-
 /* generate coalesce configuration */
 static void
-ni_compat_generate_eth_coalesce_node(xml_node_t *parent, const ni_ethtool_coalesce_t *coalesce)
+ni_compat_generate_ethtool_coalesce_node(xml_node_t *parent, const ni_ethtool_coalesce_t *coalesce)
 {
 	xml_node_t *node;
 
@@ -339,7 +309,7 @@ ni_compat_generate_eth_coalesce_node(xml_node_t *parent, const ni_ethtool_coales
 
 /* generate eee configuration */
 static void
-ni_compat_generate_eth_eee_node(xml_node_t *parent, const ni_ethtool_eee_t *eee)
+ni_compat_generate_ethtool_eee_node(xml_node_t *parent, const ni_ethtool_eee_t *eee)
 {
 	xml_node_t *node;
 
@@ -370,7 +340,7 @@ ni_compat_generate_eth_eee_node(xml_node_t *parent, const ni_ethtool_eee_t *eee)
 
 /* generate channels information */
 static void
-ni_compat_generate_eth_channels_node(xml_node_t *parent, const ni_ethtool_channels_t *channels)
+ni_compat_generate_ethtool_channels_node(xml_node_t *parent, const ni_ethtool_channels_t *channels)
 {
 	xml_node_t *node;
 
@@ -399,7 +369,7 @@ ni_compat_generate_eth_channels_node(xml_node_t *parent, const ni_ethtool_channe
 }
 /* generate ring information */
 static void
-ni_compat_generate_eth_ring_node(xml_node_t *parent, const ni_ethtool_ring_t *ring)
+ni_compat_generate_ethtool_ring_node(xml_node_t *parent, const ni_ethtool_ring_t *ring)
 {
 	xml_node_t *node;
 
@@ -425,6 +395,29 @@ ni_compat_generate_eth_ring_node(xml_node_t *parent, const ni_ethtool_ring_t *ri
 	else
 		xml_node_free(node);
 
+}
+
+static void
+ni_compat_generate_ethtool_node(xml_node_t *child, const ni_ethtool_t *ethtool)
+{
+	ni_compat_generate_ethtool_eee_node(child, ethtool->eee);
+	ni_compat_generate_ethtool_ring_node(child, ethtool->ring);
+	ni_compat_generate_ethtool_coalesce_node(child, ethtool->coalesce);
+	ni_compat_generate_ethtool_channels_node(child, ethtool->channels);
+}
+
+static ni_bool_t
+ni_compat_generate_ethtool(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
+{
+	const ni_netdev_t *dev = compat->dev;
+	xml_node_t *child;
+
+	child = xml_node_new("ethtool", ifnode);
+
+	if (dev->ethtool) {
+		ni_compat_generate_ethtool_node(child, dev->ethtool);
+	}
+	return TRUE;
 }
 
 static void
@@ -467,12 +460,6 @@ __ni_compat_generate_eth_node(xml_node_t *child, const ni_ethernet_t *eth)
 		else
 			xml_node_free(wol);
 	}
-
-	__ni_compat_generate_eth_offload_node(child, &eth->offload);
-	ni_compat_generate_eth_eee_node(child, &eth->eee);
-	ni_compat_generate_eth_ring_node(child, &eth->ring);
-	ni_compat_generate_eth_coalesce_node(child, &eth->coalesce);
-	ni_compat_generate_eth_channels_node(child, &eth->channels);
 }
 
 static ni_bool_t
@@ -2626,6 +2613,7 @@ __ni_compat_generate_ifcfg(xml_node_t *ifnode, const ni_compat_netdev_t *compat)
 	default: ;
 	}
 
+	ni_compat_generate_ethtool(ifnode, compat);
 	linknode = xml_node_new("link", ifnode);
 	if (dev->link.masterdev.name) {
 		xml_node_t *port;
