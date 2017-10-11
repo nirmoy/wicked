@@ -1393,8 +1393,11 @@ ni_ethtool_supported_mask(void)
 	unsigned int i;
 
 	if (!supported) {
-		for (i = 0; i < NI_ETHTOOL_SUPPORT_MAX; ++i)
+		for (i = 0; i < NI_ETHTOOL_SUPPORT_MAX; ++i) {
+			if (i == NI_ETHTOOL_SUPP_LINK_SETTINGS)
+				continue;
 			supported |= NI_BIT(i);
+		}
 	}
 	return supported;
 }
