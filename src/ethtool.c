@@ -46,10 +46,13 @@ enum {
 	NI_ETHTOOL_SUPP_FEATURES,
 	NI_ETHTOOL_SUPP_PAUSE,
 	NI_ETHTOOL_SUPP_EEE,
+	NI_ETHTOOL_SUPP_CHANNELS,
 
 	NI_ETHTOOL_SUPPORT_MAX
 };
-
+static int
+ni_ethtool_set_uint_param(const char *, void *, int, const char *, const char *,
+			unsigned int ,unsigned int *, unsigned int);
 static inline ni_bool_t
 ni_ethtool_supported(const ni_ethtool_t *ethtool, unsigned int flag)
 {
@@ -1100,6 +1103,72 @@ ni_ethtool_channels_new(void)
 	return channels;
 }
 
+static int
+ni_ethtool_get_channels(const char *ifname, ni_ethtool_t *ethtool)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCHANNELS = {
+		ETHTOOL_GCHANNELS,	"get channels"
+	};
+	struct ethtool_channels tmp;
+	ni_ethtool_channels_t *channels;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS))
+		return -1;
+
+	ni_ethtool_channels_free(ethtool->channels);
+	ethtool->channels = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCHANNELS, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS,
+					!(ret < 0 && errno == EOPNOTSUPP));
+
+	if (ret < 0)
+		return ret;
+
+	channels->tx = tmp.tx_count;
+	channels->rx = tmp.rx_count;
+	channels->other = tmp.other_count;
+	channels->combined = tmp.combined_count;
+
+	ethtool->channels = channels;
+	return 0;
+}
+
+static int
+ni_ethtool_set_channels(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_channels_t *channels)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCHANNELS = {
+		ETHTOOL_GCHANNELS,	"get channels"
+	};
+	struct ethtool_channels tmp;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS))
+		return -1;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCHANNELS, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS,
+					!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"tx", tmp.max_tx, &tmp.tx_count, channels->tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"rx", tmp.max_rx, &tmp.rx_count, channels->rx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"other", tmp.max_other,
+			&tmp.other_count, channels->other);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+				"combined", tmp.max_combined,
+				&tmp.combined_count, channels->combined);
+
+	return 0;
+}
+
 /*
  * coalesce (GCOALESCE,SCOALESCE)
  */
@@ -1312,6 +1381,28 @@ ni_ethtool_set_uint_single_param(const char *ifname, void *eopt,
 	return TRUE;
 }
 
+static ni_bool_t
+ni_ethtool_validate_uint_param(unsigned int *curr, unsigned int wanted,
+		unsigned int max, const char *type, const char *rparam, const char *ifname)
+{
+	if (wanted == NI_ETHTOOL_RING_DEFAULT)
+		return FALSE;
+
+	if (!curr || *curr == wanted)
+		return FALSE;
+
+	if (wanted > max) {
+		ni_warn("%s: ethtool.%s.%s option crossed max(%u) limit",
+				ifname, type, rparam, max);
+		return FALSE;
+	}
+
+	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+			"%s: ethtool.%s.%s option changed from %u to %u\n",
+			ifname, type, rparam, *curr, wanted);
+	*curr = wanted;
+	return TRUE;
+}
 static int
 ni_ethtool_set_uint_param(const char *ifname, void *eopt,
 				int eopt_code, const char *eopt_name,
