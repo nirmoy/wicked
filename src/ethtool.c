@@ -146,34 +146,60 @@ ni_ethtool_get_driver_info(const char *ifname, ni_ethtool_t *ethtool)
 		return -1;
 
 	drv_info.driver[sizeof(drv_info.driver)-1] = '\0';
-	if (!ni_string_empty(drv_info.driver))
+	if (!ni_string_empty(drv_info.driver) &&
+	    !ni_string_eq(drv_info.driver, "N/A"))
 		ni_string_dup(&info->driver, drv_info.driver);
 
 	drv_info.version[sizeof(drv_info.version)-1] = '\0';
-	if (!ni_string_empty(drv_info.version))
+	if (!ni_string_empty(drv_info.version) &&
+	    !ni_string_eq(drv_info.version, "N/A"))
 		ni_string_dup(&info->version, drv_info.version);
 
 	drv_info.fw_version[sizeof(drv_info.fw_version)-1] = '\0';
-	if (!ni_string_empty(drv_info.fw_version))
+	if (!ni_string_empty(drv_info.fw_version) &&
+	    !ni_string_eq(drv_info.fw_version, "N/A"))
 		ni_string_dup(&info->fw_version, drv_info.fw_version);
 
 	drv_info.bus_info[sizeof(drv_info.bus_info)-1] = '\0';
-	if (!ni_string_empty(drv_info.bus_info))
+	if (!ni_string_empty(drv_info.bus_info) &&
+	    !ni_string_eq(drv_info.bus_info, "N/A"))
 		ni_string_dup(&info->bus_info, drv_info.bus_info);
 
 	drv_info.erom_version[sizeof(drv_info.erom_version)-1] = '\0';
-	if (!ni_string_empty(drv_info.erom_version))
+	if (!ni_string_empty(drv_info.erom_version) &&
+	    !ni_string_eq(drv_info.erom_version, "N/A"))
 		ni_string_dup(&info->erom_version, drv_info.erom_version);
 
-	info->supports.n_stats		= drv_info.n_stats;
-	info->supports.n_priv_flags	= drv_info.n_priv_flags;
-	info->supports.testinfo_len	= drv_info.testinfo_len;
-	info->supports.eedump_len	= drv_info.eedump_len;
-	info->supports.regdump_len	= drv_info.regdump_len;
+	if ((info->supports.n_priv_flags = drv_info.n_priv_flags))
+		info->supports.mask |= NI_BIT(NI_ETHTOOL_DRIVER_SUPP_PRIV_FLAGS);
+	if ((info->supports.n_stats = drv_info.n_stats))
+		info->supports.mask |= NI_BIT(NI_ETHTOOL_DRIVER_SUPP_STATS);
+	if ((info->supports.testinfo_len = drv_info.testinfo_len))
+		info->supports.mask |= NI_BIT(NI_ETHTOOL_DRIVER_SUPP_TEST);
+	if ((info->supports.eedump_len = drv_info.eedump_len))
+		info->supports.mask |= NI_BIT(NI_ETHTOOL_DRIVER_SUPP_EEPROM);
+	if ((info->supports.regdump_len = drv_info.regdump_len))
+		info->supports.mask |= NI_BIT(NI_ETHTOOL_DRIVER_SUPP_REGDUMP);
 
 	ethtool->driver_info = info;
 
 	return 0;
+}
+
+static const ni_intmap_t	ni_ethternet_driver_supports_bits[] = {
+	{ "priv-flags",		NI_ETHTOOL_DRIVER_SUPP_PRIV_FLAGS	},
+	{ "statistics",		NI_ETHTOOL_DRIVER_SUPP_STATS		},
+	{ "selftest",		NI_ETHTOOL_DRIVER_SUPP_TEST		},
+	{ "eeprom-access",	NI_ETHTOOL_DRIVER_SUPP_EEPROM		},
+	{ "register-dump",	NI_ETHTOOL_DRIVER_SUPP_REGDUMP		},
+
+	{ NULL,			-1U					}
+};
+
+const char *
+ni_ethtool_driver_supports_map_bit(ni_ethtool_driver_supports_bit_t bit)
+{
+	return ni_format_uint_mapped(bit, ni_ethternet_driver_supports_bits);
 }
 
 
@@ -187,16 +213,16 @@ static const ni_intmap_t	ni_ethternet_duplex_names[] = {
 	{ NULL,			NI_ETHTOOL_DUPLEX_UNKNOWN	}
 };
 
-ni_bool_t
-ni_ethtool_duplex_map_name(const char *name, ni_ethtool_duplex_t *mode)
-{
-	return ni_parse_uint_mapped(name, ni_ethternet_duplex_names, mode) == 0;
-}
-
 const char *
 ni_ethtool_duplex_map_mode(ni_ethtool_duplex_t mode)
 {
 	return ni_format_uint_mapped(mode, ni_ethternet_duplex_names);
+}
+
+ni_bool_t
+ni_ethtool_duplex_map_name(const char *name, ni_ethtool_duplex_t *mode)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_duplex_names, mode) == 0;
 }
 
 static const ni_intmap_t	ni_ethternet_port_type_names[] = {
@@ -211,16 +237,16 @@ static const ni_intmap_t	ni_ethternet_port_type_names[] = {
 	{ NULL,			NI_ETHTOOL_PORT_OTHER		}
 };
 
-ni_bool_t
-ni_ethtool_port_map_type(const char *name, ni_ethtool_port_type_t *type)
-{
-	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
-}
-
 const char *
-ni_ethtool_port_map_name(ni_ethtool_port_type_t type)
+ni_ethtool_port_map_type(ni_ethtool_port_type_t type)
 {
 	return ni_format_uint_mapped(type, ni_ethternet_port_type_names);
+}
+
+ni_bool_t
+ni_ethtool_port_map_name(const char *name, ni_ethtool_port_type_t *type)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
 }
 
 void

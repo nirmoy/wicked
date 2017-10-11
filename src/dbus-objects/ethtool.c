@@ -126,7 +126,6 @@ ni_objectmodel_ethtool_get_driver_info(const ni_dbus_object_t *object,
 {
 	const ni_ethtool_t *ethtool;
 	const ni_ethtool_driver_info_t *info;
-	ni_dbus_variant_t *supp;
 
 	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
 		return FALSE;
@@ -145,24 +144,8 @@ ni_objectmodel_ethtool_get_driver_info(const ni_dbus_object_t *object,
 	if (info->erom_version)
 		ni_dbus_dict_add_string(result, "expansion-rom-version", info->erom_version);
 
-	if (!info->supports.n_priv_flags && !info->supports.n_stats &&
-	    !info->supports.testinfo_len && !info->supports.eedump_len &&
-	    !info->supports.regdump_len)
-		return TRUE;
-
-	if ((supp = ni_dbus_dict_add(result, "supports"))) {
-		ni_dbus_variant_init_dict(supp);
-		if (info->supports.n_stats)
-			ni_dbus_dict_add_bool(supp, "statistics", !!info->supports.n_stats);
-		if (info->supports.n_priv_flags)
-			ni_dbus_dict_add_bool(supp, "priv-flags", !!info->supports.n_priv_flags);
-		if (info->supports.testinfo_len > 0)
-			ni_dbus_dict_add_bool(supp, "test",          info->supports.testinfo_len > 0);
-		if (info->supports.eedump_len > 0)
-			ni_dbus_dict_add_bool(supp, "eeprom-access", info->supports.eedump_len > 0);
-		if (info->supports.regdump_len > 0)
-			ni_dbus_dict_add_bool(supp, "register-dump", info->supports.regdump_len > 0);
-	}
+	if (info->supports.mask)
+		ni_dbus_dict_add_uint32(result, "supports", info->supports.mask);
 
 	return TRUE;
 }
@@ -174,10 +157,8 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 		DBusError *error)
 {
 	ni_ethtool_driver_info_t *info;
-	const ni_dbus_variant_t *supp;
 	ni_ethtool_t *ethtool;
 	const char *str;
-	dbus_bool_t bv;
 
 	if (!ni_dbus_variant_is_dict(argument))
 		return FALSE;
@@ -201,18 +182,7 @@ ni_objectmodel_ethtool_set_driver_info(ni_dbus_object_t *object,
 	if (ni_dbus_dict_get_string(argument, "expansion-rom-version", &str))
 		ni_string_dup(&info->erom_version, str);
 
-	if ((supp = ni_dbus_dict_get(argument, "supports"))) {
-		if (ni_dbus_dict_get_bool(supp, "statistics", &bv))
-			info->supports.n_stats = bv ? 1 : 0;
-		if (ni_dbus_dict_get_bool(supp, "priv-flags", &bv))
-			info->supports.n_priv_flags = bv ? 1 : 0;
-		if (ni_dbus_dict_get_bool(supp, "test", &bv))
-			info->supports.testinfo_len = bv ? 1 : 0;
-		if (ni_dbus_dict_get_bool(supp, "eeprom-access", &bv))
-			info->supports.eedump_len = bv ? 1 : 0;
-		if (ni_dbus_dict_get_bool(supp, "register-dump", &bv))
-			info->supports.regdump_len= 1;
-	}
+	ni_dbus_dict_get_uint32(argument, "supports", &info->supports.mask);
 
 	return TRUE;
 }

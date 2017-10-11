@@ -22,13 +22,7 @@
       <bus-info              type="string"/>
       <firmware-version      type="string"/>
       <expansion-rom-version type="string"/>
-      <supports class="dict">
-        <statistics          type="boolean"/>
-	<test                type="boolean"/>
-	<eeprom-access       type="boolean"/>
-	<register-dump       type="boolean"/>
-	<priv-flags          type="boolean"/>
-      </supports>
+      <supports              type="builtin-ethtool-driver-supports-mask"/>
     </driver-info>
   </define>
 

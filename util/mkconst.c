@@ -95,8 +95,9 @@ static struct generic_map	generic_maps[] = {
 	MAP(GRE_FLAG_BIT, ni_gre_flag_bit_to_name),
 	MAP(GRE_ENCAP_TYPE, ni_gre_encap_type_to_name),
 	MAP(GRE_ENCAP_FLAG_BIT, ni_gre_encap_flag_bit_to_name),
-	MAPN(ETHTOOL_PORT_TYPE, ni_ethtool_port_map_name, NI_ETHTOOL_PORT_OTHER),
+	MAPN(ETHTOOL_PORT_TYPE, ni_ethtool_port_map_type, NI_ETHTOOL_PORT_OTHER),
 	MAP(ETHTOOL_DUPLEX_MODE, ni_ethtool_duplex_map_mode),
+	MAP(ETHTOOL_DRIVER_SUPPORTS, ni_ethtool_driver_supports_map_bit),
 
 	{ NULL }
 };

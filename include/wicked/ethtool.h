@@ -29,13 +29,24 @@
 /*
  * driver-info
  */
+typedef enum {
+	NI_ETHTOOL_DRIVER_SUPP_PRIV_FLAGS,
+	NI_ETHTOOL_DRIVER_SUPP_STATS,
+	NI_ETHTOOL_DRIVER_SUPP_TEST,
+	NI_ETHTOOL_DRIVER_SUPP_EEPROM,
+	NI_ETHTOOL_DRIVER_SUPP_REGDUMP,
+} ni_ethtool_driver_supports_bit_t;
+
 typedef struct ni_ethtool_driver_info {
 	char *			driver;
 	char *			version;
 	char *			bus_info;
 	char *			fw_version;
 	char *			erom_version;
+
 	struct {
+		unsigned int	mask;
+
 		unsigned int	n_priv_flags;
 		unsigned int	n_stats;
 		unsigned int	testinfo_len;
@@ -247,11 +258,12 @@ extern int				ni_ethtool_setup(ni_netdev_t *, const ni_ethtool_t *);
 
 extern ni_ethtool_driver_info_t *	ni_ethtool_driver_info_new(void);
 extern void				ni_ethtool_driver_info_free(ni_ethtool_driver_info_t *);
+extern const char *			ni_ethtool_driver_supports_map_bit(ni_ethtool_driver_supports_bit_t);
 
 extern ni_ethtool_link_settings_t *	ni_ethtool_link_settings_new(void);
 extern void				ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *);
-extern const char *			ni_ethtool_port_map_name(ni_ethtool_port_type_t);
-extern ni_bool_t			ni_ethtool_port_map_type(const char *, ni_ethtool_port_type_t *);
+extern const char *			ni_ethtool_port_map_type(ni_ethtool_port_type_t);
+extern ni_bool_t			ni_ethtool_port_map_name(const char *, ni_ethtool_port_type_t *);
 extern const char *			ni_ethtool_duplex_map_mode(ni_ethtool_duplex_t);
 extern ni_bool_t			ni_ethtool_duplex_map_name(const char *, ni_ethtool_duplex_t *);
 

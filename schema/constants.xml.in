@@ -238,3 +238,6 @@
 <define name="builtin-ethtool-duplex-mode" type="uint32" constraint="enum">
   <@@ETHTOOL_DUPLEX_MODE_NAME@@ value="@@ETHTOOL_DUPLEX_MODE_VALUE@@"/>
 </define>
+<define name="builtin-ethtool-driver-supports-mask" type="uint32" constraint="bitmap">
+  <@@ETHTOOL_DRIVER_SUPPORTS_NAME@@ bit="@@ETHTOOL_DRIVER_SUPPORTS_VALUE@@"/>
+</define>
