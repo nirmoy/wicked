@@ -253,7 +253,22 @@ void
 ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
 {
 	if (settings) {
+		ni_bitfield_destroy(&settings->advertising);
+		ni_bitfield_destroy(&settings->lp_advertising);
 		free(settings);
+	}
+}
+
+void
+ni_ethtool_link_settings_init(ni_ethtool_link_settings_t *settings)
+{
+	if (settings) {
+		settings->autoneg = NI_TRISTATE_DEFAULT;
+		settings->speed	  = NI_ETHTOOL_SPEED_UNKNOWN;
+		settings->duplex  = NI_ETHTOOL_DUPLEX_UNKNOWN;
+		settings->port    = NI_ETHTOOL_PORT_OTHER;
+		ni_bitfield_init(&settings->advertising);
+		ni_bitfield_init(&settings->lp_advertising);
 	}
 }
 
@@ -263,12 +278,7 @@ ni_ethtool_link_settings_new(void)
 	ni_ethtool_link_settings_t *settings;
 
 	settings = calloc(1, sizeof(*settings));
-	if (settings) {
-		settings->autoneg = NI_TRISTATE_DEFAULT;
-		settings->speed	  = NI_ETHTOOL_SPEED_UNKNOWN;
-		settings->duplex  = NI_ETHTOOL_DUPLEX_UNKNOWN;
-		settings->port    = NI_ETHTOOL_PORT_OTHER;
-	}
+	ni_ethtool_link_settings_init(settings);
 	return settings;
 }
 
@@ -319,6 +329,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	};
 	struct ethtool_cmd settings;
 	ni_ethtool_link_settings_t *link;
+	unsigned int i;
 	int ret;
 
 	ni_trace("%s(%s)", __func__, ifname);
@@ -343,6 +354,13 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	link->speed     = ethtool_cmd_speed(&settings);
 	link->duplex    = settings.duplex;
 	link->port      = settings.port;
+
+	for (i = 0; i < 32; ++i) {
+		if (settings.advertising & NI_BIT(i))
+			ni_bitfield_setbit(&link->advertising, i);
+		if (settings.lp_advertising & NI_BIT(i))
+			ni_bitfield_setbit(&link->lp_advertising, i);
+	}
 
 	ethtool->link_settings = link;
 	return 0;
@@ -1381,7 +1399,11 @@ ni_ethtool_free(ni_ethtool_t *ethtool)
 		ni_ethtool_driver_info_free(ethtool->driver_info);
 		ni_ethtool_link_settings_free(ethtool->link_settings);
 		ni_ethtool_features_free(ethtool->features);
+		ni_ethtool_channels_free(ethtool->channels);
+		ni_ethtool_coalesce_free(ethtool->coalesce);
 		ni_ethtool_pause_free(ethtool->pause);
+		ni_ethtool_ring_free(ethtool->ring);
+		ni_ethtool_eee_free(ethtool->eee);
 		free(ethtool);
 	}
 }
