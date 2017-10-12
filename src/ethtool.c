@@ -331,7 +331,6 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	};
 	struct ethtool_cmd settings;
 	ni_ethtool_link_settings_t *link;
-	unsigned int i;
 	int ret;
 
 	ni_trace("%s(%s)", __func__, ifname);
