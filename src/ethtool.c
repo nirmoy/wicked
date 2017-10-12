@@ -47,6 +47,7 @@ enum {
 	NI_ETHTOOL_SUPP_PAUSE,
 	NI_ETHTOOL_SUPP_EEE,
 	NI_ETHTOOL_SUPP_CHANNELS,
+	NI_ETHTOOL_SUPP_COALESCE,
 
 	NI_ETHTOOL_SUPPORT_MAX
 };
@@ -1220,6 +1221,162 @@ ni_ethtool_coalesce_new(void)
 	return coalesce;
 }
 
+static int
+ni_ethtool_get_coalesce(const char *ifname, ni_ethtool_t *ethtool)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCOALESCEPARAM = {
+		ETHTOOL_GCOALESCE,	"get coalesce"
+	};
+	struct ethtool_coalesce tmp;
+	ni_ethtool_coalesce_t *coalesce;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_COALESCE))
+		return -1; /* unsupported    */
+
+	ni_ethtool_coalesce_free(ethtool->coalesce);
+	ethtool->coalesce = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCOALESCEPARAM, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_COALESCE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	if (!(coalesce = ni_ethtool_coalesce_new()))
+		return -1;
+
+	ni_tristate_set(&coalesce->adaptive_tx, tmp.use_adaptive_tx_coalesce);
+	ni_tristate_set(&coalesce->adaptive_rx, tmp.use_adaptive_rx_coalesce);
+
+	coalesce->pkt_rate_low		= tmp.pkt_rate_low;
+	coalesce->pkt_rate_high		= tmp.pkt_rate_high;
+
+	coalesce->sample_interval	= tmp.rate_sample_interval;
+	coalesce->stats_block_usecs	= tmp.stats_block_coalesce_usecs;
+
+	coalesce->rx_usecs		= tmp.rx_coalesce_usecs;
+	coalesce->rx_usecs_irq		= tmp.rx_coalesce_usecs_irq;
+	coalesce->rx_usecs_low		= tmp.rx_coalesce_usecs_low;
+	coalesce->rx_usecs_high		= tmp.rx_coalesce_usecs_high;
+
+	coalesce->rx_frames		= tmp.rx_max_coalesced_frames;
+	coalesce->rx_frames_irq		= tmp.rx_max_coalesced_frames_irq;
+	coalesce->rx_frames_low		= tmp.rx_max_coalesced_frames_low;
+	coalesce->rx_frames_high	= tmp.rx_max_coalesced_frames_high;
+
+	coalesce->tx_usecs		= tmp.tx_coalesce_usecs;
+	coalesce->tx_usecs_irq		= tmp.tx_coalesce_usecs_irq;
+	coalesce->tx_usecs_low		= tmp.tx_coalesce_usecs_low;
+	coalesce->tx_usecs_high		= tmp.tx_coalesce_usecs_high;
+
+	coalesce->tx_frames		= tmp.tx_max_coalesced_frames;
+	coalesce->tx_frames_irq		= tmp.tx_max_coalesced_frames_irq;
+	coalesce->tx_frames_low		= tmp.tx_max_coalesced_frames_low;
+	coalesce->tx_frames_high	= tmp.tx_max_coalesced_frames_high;
+
+	ethtool->coalesce = coalesce;
+	return 0;
+}
+
+static int
+ni_ethtool_set_coalesce(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_coalesce_t *coalesce)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCOALESCEPARAM = {
+		ETHTOOL_GCOALESCE,	"get coalesce"
+	};
+	struct ethtool_coalesce tmp;
+	int ret;
+
+	if (!coalesce)
+		return 1; /* nothing to set */
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_COALESCE))
+		return -1; /* unsupported    */
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCOALESCEPARAM, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_COALESCE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "adaptive_tx", NI_TRISTATE_ENABLE,
+			&tmp.use_adaptive_tx_coalesce, coalesce->adaptive_tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "adaptive_rx", NI_TRISTATE_ENABLE,
+			&tmp.use_adaptive_rx_coalesce, coalesce->adaptive_rx);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "pkt_rate_low", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.pkt_rate_low, coalesce->pkt_rate_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "pkt_rate_high", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.pkt_rate_high, coalesce->pkt_rate_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "sample_interval", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.rate_sample_interval, coalesce->sample_interval);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "stats_block_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.stats_block_coalesce_usecs, coalesce->stats_block_usecs);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs, coalesce->rx_usecs);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_irq, coalesce->rx_usecs_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_low, coalesce->rx_usecs_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_usecs_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_coalesce_usecs_high, coalesce->rx_usecs_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.use_adaptive_rx_coalesce, coalesce->rx_frames);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_irq, coalesce->rx_frames_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_low, coalesce->rx_frames_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "rx_frames_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.rx_max_coalesced_frames_high, coalesce->rx_frames_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs, coalesce->tx_usecs);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_irq, coalesce->tx_usecs_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_low, coalesce->tx_usecs_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_usecs_high", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_coalesce_usecs_high, coalesce->tx_usecs_high);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.use_adaptive_tx_coalesce, coalesce->tx_frames);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_irq", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_max_coalesced_frames_irq, coalesce->tx_frames_irq);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_low", NI_ETHTOOL_COALESCE_DEFAULT,
+		&tmp.tx_max_coalesced_frames_low, coalesce->tx_frames_low);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCOALESCE,
+			"coalesce", "tx_frames_high", NI_ETHTOOL_COALESCE_DEFAULT,
+			&tmp.tx_max_coalesced_frames_high, coalesce->tx_frames_high);
+
+	return 0;
+}
+
 /*
  * pause (GPAUSEPARAM,SPAUSEPARAM)
  */
@@ -1550,6 +1707,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ni_ethtool_get_pause(dev->name, ethtool);
 	ni_ethtool_get_eee(dev->name, ethtool);
 	ni_ethtool_get_channels(dev->name, ethtool);
+	ni_ethtool_get_coalesce(dev->name, ethtool);
 
 	ni_netdev_set_ethtool(dev, ethtool);
 	return TRUE;
@@ -1589,6 +1747,7 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 	ni_ethtool_set_features(dev->name, dev->ethtool, cfg->ethtool->features);
 	ni_ethtool_set_eee(dev->name, dev->ethtool, cfg->ethtool->eee);
 	ni_ethtool_set_channels(dev->name, dev->ethtool, cfg->ethtool->channels);
+	ni_ethtool_set_coalesce(dev->name, dev->ethtool, cfg->ethtool->coalesce);
 
 	ni_ethtool_refresh(dev);
 	return 0;
