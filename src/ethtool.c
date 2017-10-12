@@ -271,8 +271,6 @@ ni_ethtool_link_settings_init(ni_ethtool_link_settings_t *settings)
 		settings->speed	  = NI_ETHTOOL_SPEED_UNKNOWN;
 		settings->duplex  = NI_ETHTOOL_DUPLEX_UNKNOWN;
 		settings->port    = NI_ETHTOOL_PORT_OTHER;
-		ni_bitfield_init(&settings->advertising);
-		ni_bitfield_init(&settings->lp_advertising);
 	}
 }
 
@@ -358,13 +356,6 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	link->speed     = ethtool_cmd_speed(&settings);
 	link->duplex    = settings.duplex;
 	link->port      = settings.port;
-
-	for (i = 0; i < 32; ++i) {
-		if (settings.advertising & NI_BIT(i))
-			ni_bitfield_setbit(&link->advertising, i);
-		if (settings.lp_advertising & NI_BIT(i))
-			ni_bitfield_setbit(&link->lp_advertising, i);
-	}
 
 	ethtool->link_settings = link;
 	return 0;
