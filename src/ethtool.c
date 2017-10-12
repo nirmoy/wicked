@@ -45,10 +45,14 @@ enum {
 	NI_ETHTOOL_SUPP_LINK_SETTINGS,
 	NI_ETHTOOL_SUPP_FEATURES,
 	NI_ETHTOOL_SUPP_PAUSE,
+	NI_ETHTOOL_SUPP_EEE,
+	NI_ETHTOOL_SUPP_CHANNELS,
 
 	NI_ETHTOOL_SUPPORT_MAX
 };
-
+static int
+ni_ethtool_set_uint_param(const char *, void *, int, const char *, const char *,
+			unsigned int ,unsigned int *, unsigned int);
 static inline ni_bool_t
 ni_ethtool_supported(const ni_ethtool_t *ethtool, unsigned int flag)
 {
@@ -1099,6 +1103,72 @@ ni_ethtool_channels_new(void)
 	return channels;
 }
 
+static int
+ni_ethtool_get_channels(const char *ifname, ni_ethtool_t *ethtool)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCHANNELS = {
+		ETHTOOL_GCHANNELS,	"get channels"
+	};
+	struct ethtool_channels tmp;
+	ni_ethtool_channels_t *channels;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS))
+		return -1;
+
+	ni_ethtool_channels_free(ethtool->channels);
+	ethtool->channels = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCHANNELS, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS,
+					!(ret < 0 && errno == EOPNOTSUPP));
+
+	if (ret < 0)
+		return ret;
+
+	channels->tx = tmp.tx_count;
+	channels->rx = tmp.rx_count;
+	channels->other = tmp.other_count;
+	channels->combined = tmp.combined_count;
+
+	ethtool->channels = channels;
+	return 0;
+}
+
+static int
+ni_ethtool_set_channels(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_channels_t *channels)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GCHANNELS = {
+		ETHTOOL_GCHANNELS,	"get channels"
+	};
+	struct ethtool_channels tmp;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS))
+		return -1;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCHANNELS, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS,
+					!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"tx", tmp.max_tx, &tmp.tx_count, channels->tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"rx", tmp.max_rx, &tmp.rx_count, channels->rx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+			"other", tmp.max_other,
+			&tmp.other_count, channels->other);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SCHANNELS, "channels",
+				"combined", tmp.max_combined,
+				&tmp.combined_count, channels->combined);
+
+	return 0;
+}
+
 /*
  * coalesce (GCOALESCE,SCOALESCE)
  */
@@ -1288,6 +1358,68 @@ ni_ethtool_ring_new(void)
 	return ring;
 }
 
+static ni_bool_t
+ni_ethtool_set_uint_single_param(const char *ifname, void *eopt,
+				int eopt_code, const char *eopt_name,
+				const char *name, unsigned int value)
+{
+	if (__ni_ethtool(ifname, eopt_code, eopt) < 0) {
+		if (errno != EOPNOTSUPP && errno != ENODEV)
+			ni_warn("%s: failed to set ethtool.%s.%s to %u: %m",
+					ifname, eopt_name, name, value);
+		else
+			ni_debug_verbose(NI_LOG_DEBUG, NI_TRACE_IFCONFIG,
+					"%s: failed to set ethtool.%s.%s to %u: %m",
+					ifname, eopt_name, name, value);
+		return FALSE;
+	}
+	else {
+		ni_debug_verbose(NI_LOG_DEBUG1, NI_TRACE_IFCONFIG,
+				"%s: applied ethtool.%s.%s = %u", ifname, eopt_name, name, value);
+	}
+
+	return TRUE;
+}
+
+static ni_bool_t
+ni_ethtool_validate_uint_param(unsigned int *curr, unsigned int wanted,
+		unsigned int max, const char *type, const char *rparam, const char *ifname)
+{
+	if (wanted == NI_ETHTOOL_RING_DEFAULT)
+		return FALSE;
+
+	if (!curr || *curr == wanted)
+		return FALSE;
+
+	if (wanted > max) {
+		ni_warn("%s: ethtool.%s.%s option crossed max(%u) limit",
+				ifname, type, rparam, max);
+		return FALSE;
+	}
+
+	ni_debug_verbose(NI_LOG_DEBUG2, NI_TRACE_IFCONFIG,
+			"%s: ethtool.%s.%s option changed from %u to %u\n",
+			ifname, type, rparam, *curr, wanted);
+	*curr = wanted;
+	return TRUE;
+}
+static int
+ni_ethtool_set_uint_param(const char *ifname, void *eopt,
+				int eopt_code, const char *eopt_name,
+				const char *name,   unsigned int max,
+				unsigned int *curr, unsigned int want)
+{
+	unsigned int save = *curr;
+
+	if (!ni_ethtool_validate_uint_param(curr, want, max, eopt_name, name, ifname))
+		return 1;
+
+	if (ni_ethtool_set_uint_single_param(ifname, eopt, eopt_code, eopt_name, name, want))
+		return 0;
+
+	*curr = save;
+	return 1;
+}
 /*
  * eee (GEEE,SEEE)
  */
@@ -1325,7 +1457,79 @@ ni_ethtool_eee_new(void)
 	return eee;
 }
 
+static int
+ni_ethtool_get_eee(const char *ifname, ni_ethtool_t *ethtool)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GEEE = {
+		ETHTOOL_GEEE,	"get eee"
+	};
+	struct ethtool_eee tmp;
+	ni_ethtool_eee_t *eee;
+	int ret;
 
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_EEE))
+		return -1;
+	
+	ni_ethtool_eee_free(ethtool->eee);
+	ethtool->eee = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GEEE, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_PAUSE,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	if (!(eee = ni_ethtool_eee_new()))
+		return -1;
+
+	ni_tristate_set(&eee->status.enabled, tmp.eee_enabled);
+	ni_tristate_set(&eee->status.active, tmp.eee_active);
+
+	eee->speed.supported = tmp.supported;
+	eee->speed.advertised = tmp.advertised;
+	eee->speed.lp_advertised = tmp.lp_advertised;
+
+	ni_tristate_set(&eee->tx_lpi.enabled, tmp.tx_lpi_enabled);
+	eee->tx_lpi.timer = tmp.tx_lpi_timer;
+
+	ethtool->eee = eee;
+	return 0;
+}
+
+static int
+ni_ethtool_set_eee(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_eee_t *eee)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GEEE = {
+		ETHTOOL_GEEE,	"get eee"
+	};
+	struct ethtool_eee tmp;
+	int ret;
+
+	if (!eee)
+		return 1; /* nothing to set */ 
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_EEE))
+		return -1; /* unsupported    */
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GEEE, &tmp, NULL);
+
+	if (ret < 0)
+		return ret;
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "enable",
+			NI_TRISTATE_ENABLE, &tmp.eee_enabled, eee->status.enabled);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "advertise",
+			NI_ETHTOOL_EEE_DEFAULT, &tmp.advertised, eee->speed.advertised);
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "tx-lpi",
+			NI_TRISTATE_ENABLE, &tmp.tx_lpi_enabled, eee->tx_lpi.enabled);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SEEE, "eee", "tx-timer",
+			NI_ETHTOOL_EEE_DEFAULT, &tmp.tx_lpi_timer, eee->tx_lpi.timer);
+
+	return 0;
+}
 /*
  * main system refresh and setup functions
  */
@@ -1347,6 +1551,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ni_ethtool_get_link_settings(dev->name, ethtool);
 	ni_ethtool_get_features(dev->name, ethtool);
 	ni_ethtool_get_pause(dev->name, ethtool);
+	ni_ethtool_get_eee(dev->name, ethtool);
 
 	ni_netdev_set_ethtool(dev, ethtool);
 	return TRUE;
