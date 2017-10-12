@@ -48,6 +48,7 @@ enum {
 	NI_ETHTOOL_SUPP_EEE,
 	NI_ETHTOOL_SUPP_CHANNELS,
 	NI_ETHTOOL_SUPP_COALESCE,
+	NI_ETHTOOL_SUPP_RING,
 
 	NI_ETHTOOL_SUPPORT_MAX
 };
@@ -1510,6 +1511,76 @@ ni_ethtool_ring_new(void)
 	return ring;
 }
 
+static int
+ni_ethtool_get_ring(const char *ifname, ni_ethtool_t *ethtool)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GRINGPARAM = {
+		ETHTOOL_GRINGPARAM,	"get ring"
+	};
+	struct ethtool_ringparam tmp;
+	ni_ethtool_ring_t *ring;
+	int ret;
+
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_RING))
+		return -1; /* unsupported    */
+
+	ni_ethtool_ring_free(ethtool->ring);
+	ethtool->ring = NULL;
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GRINGPARAM, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_RING,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	if (!(ring = ni_ethtool_ring_new()))
+		return -1;
+
+	ring->tx = tmp.tx_pending;
+	ring->rx = tmp.rx_pending;
+	ring->rx_jumbo = tmp.rx_jumbo_pending;
+	ring->rx_mini = tmp.rx_mini_pending;
+
+	ethtool->ring = ring;
+	return 0;
+}
+
+static int
+ni_ethtool_set_ring(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_ring_t *ring)
+{
+	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GRINGPARAM = {
+		ETHTOOL_GRINGPARAM,	"get ring"
+	};
+	struct ethtool_ringparam tmp;
+	int ret;
+
+	if (!ring)
+		return  1; /* nothing to set */
+	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_RING))
+		return -1; /* unsupported    */
+
+	memset(&tmp, 0, sizeof(tmp));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GRINGPARAM, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_RING,
+				!(ret < 0 && errno == EOPNOTSUPP));
+	if (ret < 0)
+		return ret;
+
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"tx", tmp.tx_max_pending, &tmp.tx_pending, ring->tx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"rx", tmp.rx_max_pending, &tmp.rx_pending, ring->rx);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+			"rx-jumbo", tmp.rx_jumbo_max_pending,
+			&tmp.rx_jumbo_pending, ring->rx_jumbo);
+	ni_ethtool_set_uint_param(ifname, &tmp, ETHTOOL_SRINGPARAM, "ring",
+				"rx-mini", tmp.rx_mini_max_pending,
+				&tmp.rx_mini_pending, ring->rx_mini);
+
+	return 0;
+}
+
 static ni_bool_t
 ni_ethtool_set_uint_single_param(const char *ifname, void *eopt,
 				int eopt_code, const char *eopt_name,
@@ -1708,6 +1779,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ni_ethtool_get_eee(dev->name, ethtool);
 	ni_ethtool_get_channels(dev->name, ethtool);
 	ni_ethtool_get_coalesce(dev->name, ethtool);
+	ni_ethtool_get_ring(dev->name, ethtool);
 
 	ni_netdev_set_ethtool(dev, ethtool);
 	return TRUE;
@@ -1748,6 +1820,7 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 	ni_ethtool_set_eee(dev->name, dev->ethtool, cfg->ethtool->eee);
 	ni_ethtool_set_channels(dev->name, dev->ethtool, cfg->ethtool->channels);
 	ni_ethtool_set_coalesce(dev->name, dev->ethtool, cfg->ethtool->coalesce);
+	ni_ethtool_set_ring(dev->name, dev->ethtool, cfg->ethtool->ring);
 
 	ni_ethtool_refresh(dev);
 	return 0;
