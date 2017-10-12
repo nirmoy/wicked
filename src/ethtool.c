@@ -1118,6 +1118,9 @@ ni_ethtool_get_channels(const char *ifname, ni_ethtool_t *ethtool)
 	if (ret < 0)
 		return ret;
 
+	if (!(channels = ni_ethtool_channels_new()))
+		return -1;
+
 	channels->tx = tmp.tx_count;
 	channels->rx = tmp.rx_count;
 	channels->other = tmp.other_count;
@@ -1136,8 +1139,10 @@ ni_ethtool_set_channels(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_ch
 	struct ethtool_channels tmp;
 	int ret;
 
+	if (!channels)
+		return 1; /* nothing to set */
 	if (!ni_ethtool_supported(ethtool, NI_ETHTOOL_SUPP_CHANNELS))
-		return -1;
+		return -1; /* unsupported    */
 
 	memset(&tmp, 0, sizeof(tmp));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GCHANNELS, &tmp, NULL);
@@ -1504,6 +1509,8 @@ ni_ethtool_set_eee(const char *ifname, ni_ethtool_t *ethtool, ni_ethtool_eee_t *
 
 	memset(&tmp, 0, sizeof(tmp));
 	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GEEE, &tmp, NULL);
+	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_EEE,
+				!(ret < 0 && errno == EOPNOTSUPP));
 
 	if (ret < 0)
 		return ret;
@@ -1543,6 +1550,7 @@ ni_ethtool_refresh(ni_netdev_t *dev)
 	ni_ethtool_get_features(dev->name, ethtool);
 	ni_ethtool_get_pause(dev->name, ethtool);
 	ni_ethtool_get_eee(dev->name, ethtool);
+	ni_ethtool_get_channels(dev->name, ethtool);
 
 	ni_netdev_set_ethtool(dev, ethtool);
 	return TRUE;
@@ -1580,6 +1588,8 @@ ni_system_ethtool_setup(ni_netconfig_t *nc, ni_netdev_t *dev, const ni_netdev_t 
 	ni_ethtool_set_pause(dev->name, dev->ethtool, cfg->ethtool->pause);
 	ni_ethtool_set_link_settings(dev->name, dev->ethtool, cfg->ethtool->link_settings);
 	ni_ethtool_set_features(dev->name, dev->ethtool, cfg->ethtool->features);
+	ni_ethtool_set_eee(dev->name, dev->ethtool, cfg->ethtool->eee);
+	ni_ethtool_set_channels(dev->name, dev->ethtool, cfg->ethtool->channels);
 
 	ni_ethtool_refresh(dev);
 	return 0;
