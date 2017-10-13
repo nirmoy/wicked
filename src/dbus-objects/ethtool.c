@@ -749,14 +749,13 @@ ni_objectmodel_ethtool_get_ring(const ni_dbus_object_t *object,
 		return FALSE;
 
 	if (ethtool->ring->tx != NI_ETHTOOL_RING_DEFAULT)
-		ni_dbus_dict_add_int32(result, "tx", ethtool->ring->tx);
-
+		ni_dbus_dict_add_uint32(result, "tx", ethtool->ring->tx);
 	if (ethtool->ring->rx != NI_ETHTOOL_RING_DEFAULT)
-		ni_dbus_dict_add_int32(result, "rx", ethtool->ring->rx);
+		ni_dbus_dict_add_uint32(result, "rx", ethtool->ring->rx);
 	if (ethtool->ring->rx_jumbo != NI_ETHTOOL_RING_DEFAULT)
-		ni_dbus_dict_add_int32(result, "rx-jumbo", ethtool->ring->rx_jumbo);
+		ni_dbus_dict_add_uint32(result, "rx-jumbo", ethtool->ring->rx_jumbo);
 	if (ethtool->ring->rx_mini != NI_ETHTOOL_RING_DEFAULT)
-		ni_dbus_dict_add_int32(result, "rx-mini", ethtool->ring->rx_mini);
+		ni_dbus_dict_add_uint32(result, "rx-mini", ethtool->ring->rx_mini);
 
 	return TRUE;
 }
