@@ -58,7 +58,7 @@ ni_ethtool_set_uint_param(const char *, void *, int, const char *, const char *,
 static inline ni_bool_t
 ni_ethtool_supported(const ni_ethtool_t *ethtool, unsigned int flag)
 {
-	return ethtool ? ethtool->supported & NI_BIT(flag) : FALSE;
+	return ethtool && (ethtool->supported & NI_BIT(flag));
 }
 
 static inline ni_bool_t
