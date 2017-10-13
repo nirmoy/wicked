@@ -8,6 +8,7 @@
     <link-speed              type="uint32"/>
     <port-type               type="builtin-ethtool-port-type"/>
     <duplex                  type="builtin-ethtool-duplex-mode"/>
+    <advertising             class="array" element-type="string"/>
     <pause class="dict">
       <autoneg               type="boolean"/>
       <rx                    type="boolean"/>
@@ -24,6 +25,7 @@
       <expansion-rom-version type="string"/>
       <supports              type="builtin-ethtool-driver-supports-mask"/>
     </driver-info>
+    <lp-advertising          class="array" element-type="string"/>
   </define>
 
   <method name="changeDevice">

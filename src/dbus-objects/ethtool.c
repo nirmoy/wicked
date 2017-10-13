@@ -221,10 +221,10 @@ ni_objectmodel_ethtool_set_autoneg(ni_dbus_object_t *object,
 
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
 		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+	if (!(link = ethtool->link_settings) && !(link = ni_ethtool_link_settings_new()))
 		return FALSE;
-	
-	link = ethtool->link_settings;
+
+	ethtool->link_settings = link;
 	if (ni_dbus_variant_get_bool(argument, &bv))
 		ni_tristate_set(&link->autoneg, bv);
 	else
@@ -262,10 +262,10 @@ ni_objectmodel_ethtool_set_link_speed(ni_dbus_object_t *object,
 
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
 		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+	if (!(link = ethtool->link_settings) && !(link = ni_ethtool_link_settings_new()))
 		return FALSE;
-	
-	link = ethtool->link_settings;
+
+	ethtool->link_settings = link;
 	if (ni_dbus_variant_get_uint32(argument, &u32))
 		link->speed = u32;
 	else
@@ -303,10 +303,10 @@ ni_objectmodel_ethtool_set_port_type(ni_dbus_object_t *object,
 
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
 		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+	if (!(link = ethtool->link_settings) && !(link = ni_ethtool_link_settings_new()))
 		return FALSE;
-	
-	link = ethtool->link_settings;
+
+	ethtool->link_settings = link;
 	if (ni_dbus_variant_get_uint32(argument, &u32))
 		link->port = u32;
 	else
@@ -344,14 +344,77 @@ ni_objectmodel_ethtool_set_duplex(ni_dbus_object_t *object,
 
 	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
 		return FALSE;
-	if (!ethtool->link_settings && !(link = ni_ethtool_link_settings_new()))
+	if (!(link = ethtool->link_settings) && !(link = ni_ethtool_link_settings_new()))
 		return FALSE;
-	
-	link = ethtool->link_settings;
+
+	ethtool->link_settings = link;
 	if (ni_dbus_variant_get_uint32(argument, &u32))
 		link->duplex = u32;
 	else
 		link->duplex = NI_ETHTOOL_DUPLEX_UNKNOWN;
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_get_link_advertising(const ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		ni_dbus_variant_t *result,
+		DBusError *error)
+{
+	ni_string_array_t names = NI_STRING_ARRAY_INIT;
+	const ni_ethtool_link_settings_t *link;
+	const ni_ethtool_t *ethtool;
+	unsigned int bit, bits;
+	const char *name;
+
+	if (!(ethtool = ni_objectmodel_ethtool_read_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings))
+		return FALSE;
+
+	bits = ni_bitfield_bits(&link->advertising);
+	for (bit = 0; bit < bits; ++bit) {
+		if (!ni_bitfield_testbit(&link->advertising, bit))
+			continue;
+		if (!(name = ni_ethternet_link_mode_map_bit(bit)))
+			continue;
+		ni_string_array_append(&names, name);
+	}
+	if (!names.count)
+		return FALSE;
+
+	ni_dbus_variant_set_string_array(result, (const char **)names.data, names.count);
+	ni_string_array_destroy(&names);
+	return TRUE;
+}
+
+static dbus_bool_t
+ni_objectmodel_ethtool_set_link_advertising(ni_dbus_object_t *object,
+		const ni_dbus_property_t *property,
+		const ni_dbus_variant_t *argument,
+		DBusError *error)
+{
+	ni_ethtool_link_settings_t *link;
+	ni_ethtool_t *ethtool;
+	unsigned int bit;
+	const char *name;
+	size_t len, i;
+
+	if (!ni_dbus_variant_is_string_array(argument))
+		return FALSE;
+	if (!(ethtool = ni_objectmodel_ethtool_write_handle(object, error)))
+		return FALSE;
+	if (!(link = ethtool->link_settings) && !(link = ni_ethtool_link_settings_new()))
+		return FALSE;
+
+	ethtool->link_settings = link;
+	if ((len = argument->array.len) > 64)
+		len = 64;
+	for (i = 0; i < len; ++i) {
+		name = argument->string_array_value[i];
+		if (ni_ethternet_link_mode_map_name(name, &bit))
+			ni_bitfield_setbit(&link->advertising, bit);
+	}
 	return TRUE;
 }
 
@@ -803,30 +866,39 @@ ni_objectmodel_ethtool_set_eee(ni_dbus_object_t *object,
 /*
  * ethtool service properties
  */
-#define ETHTOOL_DICT_PROPERTY(type, dbus_name, fstem_name, rw) \
+#define ETHTOOL_DICT_PROPERTY(dbus_name, fstem_name, rw) \
 	___NI_DBUS_PROPERTY(NI_DBUS_DICT_SIGNATURE, dbus_name, \
-			fstem_name, ni_objectmodel_##type, rw)
-#define ETHTOOL_BOOL_PROPERTY(type, dbus_name, fstem_name, rw) \
+			fstem_name, ni_objectmodel_ethtool, rw)
+#define ETHTOOL_BOOL_PROPERTY(dbus_name, fstem_name, rw) \
 	___NI_DBUS_PROPERTY(DBUS_TYPE_BOOLEAN_AS_STRING, dbus_name, \
-			fstem_name, ni_objectmodel_##type, rw)
-#define ETHTOOL_UINT_PROPERTY(type, dbus_name, fstem_name, rw) \
+			fstem_name, ni_objectmodel_ethtool, rw)
+#define ETHTOOL_UINT_PROPERTY(dbus_name, fstem_name, rw) \
 	___NI_DBUS_PROPERTY(DBUS_TYPE_UINT32_AS_STRING, dbus_name, \
-			fstem_name, ni_objectmodel_##type, rw)
+			fstem_name, ni_objectmodel_ethtool, rw)
+/* TODO: Use array of u32 enums instead the string mapped to it */
+#define ETHTOOL_ENUMS_PROPERTY(dbus_name, fstem_name, rw) \
+	___NI_DBUS_PROPERTY(DBUS_TYPE_ARRAY_AS_STRING \
+			DBUS_TYPE_STRING_AS_STRING, dbus_name, \
+			fstem_name, ni_objectmodel_ethtool, rw)
 
 static const ni_dbus_property_t		ni_objectmodel_ethtool_properties[] = {
 	/* read-only (show-xml) info    */
-	ETHTOOL_DICT_PROPERTY(ethtool, driver-info, driver_info, RO),
+	ETHTOOL_DICT_PROPERTY	(driver-info,	driver_info,		RO),
+#if 0
+	ETHTOOL_ENUMS_PROPERTY	(lp-advertising,link_lp_advertising,	RO),
+#endif
 	/* also setup config properties */
-	ETHTOOL_BOOL_PROPERTY(ethtool, autoneg,     autoneg,     RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, link-speed,  link_speed,  RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, port-type,   port_type,   RO),
-	ETHTOOL_UINT_PROPERTY(ethtool, duplex,      duplex,      RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, offload,     features,    RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, channels,    channels,    RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, coalesce,    coalesce,    RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, pause,       pause,       RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, ring,        ring,        RO),
-	ETHTOOL_DICT_PROPERTY(ethtool, eee,         eee,        RO),
+	ETHTOOL_ENUMS_PROPERTY	(advertising,	link_advertising,	RO),
+	ETHTOOL_BOOL_PROPERTY	(autoneg,	autoneg,		RO),
+	ETHTOOL_UINT_PROPERTY	(link-speed,	link_speed,		RO),
+	ETHTOOL_UINT_PROPERTY	(port-type,	port_type,		RO),
+	ETHTOOL_UINT_PROPERTY	(duplex,	duplex,			RO),
+	ETHTOOL_DICT_PROPERTY	(offload,	features,		RO),
+	ETHTOOL_DICT_PROPERTY	(channels,	channels,		RO),
+	ETHTOOL_DICT_PROPERTY	(coalesce,	coalesce,		RO),
+	ETHTOOL_DICT_PROPERTY	(pause,		pause,			RO),
+	ETHTOOL_DICT_PROPERTY	(ring,		ring,			RO),
+	ETHTOOL_DICT_PROPERTY	(eee,		eee,			RO),
 
 	{ NULL }
 };

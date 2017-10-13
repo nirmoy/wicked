@@ -83,6 +83,8 @@ typedef struct ni_ethtool_link_settings {
 	unsigned int			speed;
 	uint8_t				duplex;
 	uint8_t				port;
+
+	ni_bitfield_t			supported;
 	ni_bitfield_t			advertising;
 	ni_bitfield_t			lp_advertising;
 } ni_ethtool_link_settings_t;
@@ -269,6 +271,8 @@ extern const char *			ni_ethtool_port_map_type(ni_ethtool_port_type_t);
 extern ni_bool_t			ni_ethtool_port_map_name(const char *, ni_ethtool_port_type_t *);
 extern const char *			ni_ethtool_duplex_map_mode(ni_ethtool_duplex_t);
 extern ni_bool_t			ni_ethtool_duplex_map_name(const char *, ni_ethtool_duplex_t *);
+extern const char *			ni_ethternet_link_mode_map_bit(unsigned int bit);
+extern ni_bool_t			ni_ethternet_link_mode_map_name(const char *, unsigned int *);
 
 extern ni_ethtool_features_t *		ni_ethtool_features_new(void);
 extern void				ni_ethtool_features_free(ni_ethtool_features_t *);

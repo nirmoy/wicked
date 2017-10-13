@@ -253,10 +253,81 @@ ni_ethtool_port_map_name(const char *name, ni_ethtool_port_type_t *type)
 	return ni_parse_uint_mapped(name, ni_ethternet_port_type_names, type) == 0;
 }
 
+/* Ahm... use an array instead? */
+static const ni_intmap_t	ni_ethternet_link_mode_names[] = {
+	{ "10baseT-Half",		ETHTOOL_LINK_MODE_10baseT_Half_BIT	},
+	{ "10baseT-Full",		ETHTOOL_LINK_MODE_10baseT_Full_BIT	},
+	{ "100baseT-Half",		ETHTOOL_LINK_MODE_100baseT_Half_BIT	},
+	{ "100baseT-Full",		ETHTOOL_LINK_MODE_100baseT_Full_BIT	},
+	{ "1000baseT-Half",		ETHTOOL_LINK_MODE_1000baseT_Half_BIT	},
+	{ "1000baseT-Full",		ETHTOOL_LINK_MODE_1000baseT_Full_BIT	},
+	{ "Autoneg",			ETHTOOL_LINK_MODE_Autoneg_BIT		},
+	{ "TP",				ETHTOOL_LINK_MODE_TP_BIT		},
+	{ "AUI",			ETHTOOL_LINK_MODE_AUI_BIT		},
+	{ "MII",			ETHTOOL_LINK_MODE_MII_BIT		},
+	{ "FIBRE",			ETHTOOL_LINK_MODE_FIBRE_BIT		},
+	{ "BNC",			ETHTOOL_LINK_MODE_BNC_BIT		},
+	{ "10000baseT-Full",		ETHTOOL_LINK_MODE_10000baseT_Full_BIT	},
+	{ "Pause",			ETHTOOL_LINK_MODE_Pause_BIT		},
+	{ "Asym-Pause",			ETHTOOL_LINK_MODE_Asym_Pause_BIT	},
+	{ "2500baseX-Full",		ETHTOOL_LINK_MODE_2500baseX_Full_BIT	},
+	{ "Backplane",			ETHTOOL_LINK_MODE_Backplane_BIT		},
+	{ "1000baseKX-Full",		ETHTOOL_LINK_MODE_1000baseKX_Full_BIT	},
+	{ "10000baseKX4-Full",		ETHTOOL_LINK_MODE_10000baseKX4_Full_BIT	},
+	{ "10000baseKR-Full",		ETHTOOL_LINK_MODE_10000baseKR_Full_BIT	},
+	{ "10000baseR-FEC",		ETHTOOL_LINK_MODE_10000baseR_FEC_BIT	},
+	{ "20000baseMLD2-Full",		ETHTOOL_LINK_MODE_20000baseMLD2_Full_BIT},
+	{ "20000baseKR2-Full",		ETHTOOL_LINK_MODE_20000baseKR2_Full_BIT	},
+	{ "40000baseKR4-Full",		ETHTOOL_LINK_MODE_40000baseKR4_Full_BIT	},
+	{ "40000baseCR4-Full",		ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT	},
+	{ "40000baseSR4-Full",		ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT	},
+	{ "40000baseLR4-Full",		ETHTOOL_LINK_MODE_40000baseLR4_Full_BIT	},
+	{ "56000baseKR4-Full",		ETHTOOL_LINK_MODE_56000baseKR4_Full_BIT	},
+	{ "56000baseCR4-Full",		ETHTOOL_LINK_MODE_56000baseCR4_Full_BIT	},
+	{ "56000baseSR4-Full",		ETHTOOL_LINK_MODE_56000baseSR4_Full_BIT	},
+	{ "56000baseLR4-Full",		ETHTOOL_LINK_MODE_56000baseLR4_Full_BIT	},
+	{ "25000baseCR-Full",		ETHTOOL_LINK_MODE_25000baseCR_Full_BIT	},
+	{ "25000baseKR-Full",		ETHTOOL_LINK_MODE_25000baseKR_Full_BIT	},
+	{ "25000baseSR-Full",		ETHTOOL_LINK_MODE_25000baseSR_Full_BIT	},
+	{ "50000baseCR2-Full",		ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT	},
+	{ "50000baseKR2-Full",		ETHTOOL_LINK_MODE_50000baseKR2_Full_BIT	},
+	{ "100000baseKR4-Full",		ETHTOOL_LINK_MODE_100000baseKR4_Full_BIT},
+	{ "100000baseSR4-Full",		ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT},
+	{ "100000baseCR4-Full",		ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT},
+	{ "100000baseLR4-ER4-Full",	ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT },
+	{ "50000baseSR2-Full",		ETHTOOL_LINK_MODE_50000baseSR2_Full_BIT	},
+	{ "1000baseX-Full",		ETHTOOL_LINK_MODE_1000baseX_Full_BIT	},
+	{ "10000baseCR-Full",		ETHTOOL_LINK_MODE_10000baseCR_Full_BIT	},
+	{ "10000baseSR-Full",		ETHTOOL_LINK_MODE_10000baseSR_Full_BIT	},
+	{ "10000baseLR-Full",		ETHTOOL_LINK_MODE_10000baseLR_Full_BIT	},
+	{ "10000baseLRM-Full",		ETHTOOL_LINK_MODE_10000baseLRM_Full_BIT	},
+	{ "10000baseER-Full",		ETHTOOL_LINK_MODE_10000baseER_Full_BIT	},
+	{ "2500baseT-Full",		ETHTOOL_LINK_MODE_2500baseT_Full_BIT	},
+	{ "5000baseT-Full",		ETHTOOL_LINK_MODE_5000baseT_Full_BIT	},
+	{ "FEC-NONE",			ETHTOOL_LINK_MODE_FEC_NONE_BIT		},
+	{ "FEC-RS",			ETHTOOL_LINK_MODE_FEC_RS_BIT		},
+	{ "FEC-BASER",			ETHTOOL_LINK_MODE_FEC_BASER_BIT		},
+
+	{ NULL,				-1U					}
+};
+
+const char *
+ni_ethternet_link_mode_map_bit(unsigned int bit)
+{
+	return ni_format_uint_mapped(bit, ni_ethternet_link_mode_names);
+}
+
+ni_bool_t
+ni_ethternet_link_mode_map_name(const char *name, unsigned int *bit)
+{
+	return ni_parse_uint_mapped(name, ni_ethternet_link_mode_names, bit) == 0;
+}
+
 void
 ni_ethtool_link_settings_free(ni_ethtool_link_settings_t *settings)
 {
 	if (settings) {
+		ni_bitfield_destroy(&settings->supported);
 		ni_bitfield_destroy(&settings->advertising);
 		ni_bitfield_destroy(&settings->lp_advertising);
 		free(settings);
@@ -329,7 +400,7 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GSET	= {
 		ETHTOOL_GSET,          "get settings"
 	};
-	struct ethtool_cmd settings;
+	struct ethtool_cmd ecmd;
 	ni_ethtool_link_settings_t *link;
 	int ret;
 
@@ -341,8 +412,8 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_free(ethtool->link_settings);
 	ethtool->link_settings = NULL;
 
-	memset(&settings, 0, sizeof(settings));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &settings, NULL);
+	memset(&ecmd, 0, sizeof(ecmd));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GSET, &ecmd, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_LEGACY,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0)
@@ -351,10 +422,10 @@ ni_ethtool_get_legacy_settings(const char *ifname, ni_ethtool_t *ethtool)
 	if (!(link = ni_ethtool_link_settings_new()))
 		return -1;
 
-	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
-	link->speed     = ethtool_cmd_speed(&settings);
-	link->duplex    = settings.duplex;
-	link->port      = settings.port;
+	link->autoneg	= ecmd.autoneg == AUTONEG_ENABLE;
+	link->speed     = ethtool_cmd_speed(&ecmd);
+	link->duplex    = ecmd.duplex;
+	link->port      = ecmd.port;
 
 	ethtool->link_settings = link;
 	return 0;
@@ -483,7 +554,10 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	static const ni_ethtool_cmd_info_t NI_ETHTOOL_CMD_GLINKSETINGS = {
 		ETHTOOL_GLINKSETTINGS,	"get link-settings"
 	};
-	struct ethtool_link_settings settings;
+	struct {
+		struct ethtool_link_settings settings;
+		uint32_t link_mode_maps[3 * SCHAR_MAX];
+	} ecmd;
 	ni_ethtool_link_settings_t *link;
 	int ret;
 
@@ -495,23 +569,60 @@ ni_ethtool_get_link_settings(const char *ifname, ni_ethtool_t *ethtool)
 	ni_ethtool_link_settings_free(ethtool->link_settings);
 	ethtool->link_settings = NULL;
 
-	memset(&settings, 0, sizeof(settings));
-	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &settings, NULL);
+	memset(&ecmd, 0, sizeof(ecmd));
+	ret = ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &ecmd, NULL);
 	ni_ethtool_set_supported(ethtool, NI_ETHTOOL_SUPP_LINK_SETTINGS,
 				!(ret < 0 && errno == EOPNOTSUPP));
 	if (ret < 0) {
 		if (errno == EOPNOTSUPP)
 			return ni_ethtool_get_legacy_settings(ifname, ethtool);
 		return ret;
+	} else
+	if (ecmd.settings.link_mode_masks_nwords < 0) {
+		int8_t nwords = -ecmd.settings.link_mode_masks_nwords;
+
+		memset(&ecmd, 0, sizeof(ecmd));
+		ecmd.settings.link_mode_masks_nwords = nwords;
+		if (ni_ethtool_call(ifname, &NI_ETHTOOL_CMD_GLINKSETINGS, &ecmd, NULL) < 0)
+			return -1;
 	}
 
 	if (!(link = ni_ethtool_link_settings_new()))
 		return -1;
 
-	link->autoneg	= settings.autoneg == AUTONEG_ENABLE;
-	link->speed     = settings.speed;
-	link->duplex    = settings.duplex;
-	link->port      = settings.port;
+	link->autoneg	= ecmd.settings.autoneg == AUTONEG_ENABLE;
+	link->speed     = ecmd.settings.speed;
+	link->duplex    = ecmd.settings.duplex;
+	link->port      = ecmd.settings.port;
+
+	ni_trace("%s: [2] link_mode_masks_nwords=%d\n", ifname, ecmd.settings.link_mode_masks_nwords);
+	if (ecmd.settings.link_mode_masks_nwords > 0) {
+		size_t len = ecmd.settings.link_mode_masks_nwords * sizeof(uint32_t);
+		unsigned int idx = 0;
+		unsigned int bit, bits;
+
+		ni_bitfield_set_data(&link->supported, &ecmd.link_mode_maps[idx], len);
+		idx += ecmd.settings.link_mode_masks_nwords;
+		ni_bitfield_set_data(&link->advertising, &ecmd.link_mode_maps[idx], len);
+		idx += ecmd.settings.link_mode_masks_nwords;
+		ni_bitfield_set_data(&link->lp_advertising, &ecmd.link_mode_maps[idx], len);
+
+		bits = len * 8;
+		for (bit = 0; bit < bits; ++bit) {
+			const char *name = ni_ethternet_link_mode_map_bit(bit);
+			ni_bool_t supported, advertising, lp_advertising;
+
+			supported = ni_bitfield_testbit(&link->supported, bit);
+			advertising = ni_bitfield_testbit(&link->advertising, bit);
+			lp_advertising = ni_bitfield_testbit(&link->lp_advertising, bit);
+			if (supported || advertising || lp_advertising) {
+				ni_trace("%s: %s =>%s%s%s", ifname, name,
+					supported ? " supported" : "",
+					advertising ? " advertised" : "",
+					lp_advertising ? " lp-advertised" : "");
+			}
+		}
+	}
 
 	ethtool->link_settings = link;
 	return 0;
@@ -1621,8 +1732,10 @@ ni_ethtool_supported_mask(void)
 
 	if (!supported) {
 		for (i = 0; i < NI_ETHTOOL_SUPPORT_MAX; ++i) {
+#if 0
 			if (i == NI_ETHTOOL_SUPP_LINK_SETTINGS)
 				continue;
+#endif
 			supported |= NI_BIT(i);
 		}
 	}
