@@ -745,6 +745,12 @@ ni_bitfield_bytes(const ni_bitfield_t *bf)
 	return bf ? bf->size * sizeof(uint32_t) : 0;
 }
 
+size_t
+ni_bitfield_bits(const ni_bitfield_t *bf)
+{
+	return bf ? bf->size * 32 : 0;
+}
+
 static inline ni_bool_t
 ni_bitfield_grow(ni_bitfield_t *bf, unsigned int bit)
 {
@@ -755,9 +761,8 @@ ni_bitfield_grow(ni_bitfield_t *bf, unsigned int bit)
 		const unsigned int local_words = local_bytes / sizeof(uint32_t);
 
 		if (nwords < local_words) {
-			memset(bf->__local_field, 0, local_bytes);
 			bf->field = bf->__local_field;
-			bf->size = local_words;
+			bf->size = nwords;
 		} else {
 			uint32_t *new_field;
 
